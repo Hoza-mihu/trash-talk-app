@@ -9,8 +9,9 @@ numpy==1.24.3
 pillow==10.1.0
 
 # Image Processing
-opencv-python==4.8.1.78
-scikit-image==0.22.0
+# opencv-python-headless removed - not used, using PIL instead
+# scikit-image removed - not used
+# Using PIL (Pillow) for all image processing
 
 # Utilities
 python-dotenv==1.0.0
