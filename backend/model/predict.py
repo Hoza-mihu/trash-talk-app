@@ -2,7 +2,7 @@ import numpy as np
 from PIL import Image
 import os
 from typing import Dict, Optional
-import cv2
+# cv2 removed - not used in this code, using PIL instead
 
 # Suppress TensorFlow warnings BEFORE importing
 import os
