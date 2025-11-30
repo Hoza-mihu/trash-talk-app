@@ -1,0 +1,36 @@
+# Web Framework
+flask==3.0.0
+flask-cors==4.0.0
+
+# Machine Learning
+tensorflow==2.15.0
+keras==2.15.0
+numpy==1.24.3
+pillow==10.1.0
+
+# Image Processing
+opencv-python==4.8.1.78
+scikit-image==0.22.0
+
+# Utilities
+python-dotenv==1.0.0
+python-dateutil==2.8.2
+
+# Production Server
+gunicorn==21.2.0
+gevent==23.9.1
+
+# Logging & Monitoring
+loguru==0.7.2
+
+# Optional: Database (if using PostgreSQL)
+# psycopg2-binary==2.9.9
+
+# Optional: Redis (for caching)
+# redis==5.0.1
+
+# Development Tools
+pytest==7.4.3
+pytest-cov==4.1.0
+black==23.12.0
+flake8==6.1.0
