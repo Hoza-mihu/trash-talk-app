@@ -43,3 +43,20 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #059669;
 }
+
+/* Force input text to be black/dark */
+input[type="email"],
+input[type="password"],
+input[type="text"],
+input[type="tel"] {
+  color: #111827 !important;
+}
+
+/* Handle autocomplete styling */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-text-fill-color: #111827 !important;
+  color: #111827 !important;
+}
