@@ -133,7 +133,7 @@ export default function AuthPage() {
                         name="name"
                         value={formData.name}
                         onChange={handleChange}
-                        className="w-full pl-10 pr-3 py-3 rounded-xl border border-gray-200 focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                        className="w-full pl-10 pr-3 py-3 rounded-xl border border-gray-200 focus:border-green-500 focus:ring-2 focus:ring-green-100 text-gray-900 placeholder:text-gray-400"
                         placeholder="Jane Doe"
                       />
                     </div>
@@ -147,7 +147,7 @@ export default function AuthPage() {
                         name="phone"
                         value={formData.phone}
                         onChange={handleChange}
-                        className="w-full pl-10 pr-3 py-3 rounded-xl border border-gray-200 focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                        className="w-full pl-10 pr-3 py-3 rounded-xl border border-gray-200 focus:border-green-500 focus:ring-2 focus:ring-green-100 text-gray-900 placeholder:text-gray-400"
                         placeholder="+1 555 555 1234"
                       />
                     </div>
@@ -165,7 +165,7 @@ export default function AuthPage() {
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    className="w-full pl-10 pr-3 py-3 rounded-xl border border-gray-200 focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                    className="w-full pl-10 pr-3 py-3 rounded-xl border border-gray-200 focus:border-green-500 focus:ring-2 focus:ring-green-100 text-gray-900 placeholder:text-gray-400"
                     placeholder="you@example.com"
                   />
                 </div>
@@ -181,7 +181,7 @@ export default function AuthPage() {
                     name="password"
                     value={formData.password}
                     onChange={handleChange}
-                    className="w-full pl-10 pr-3 py-3 rounded-xl border border-gray-200 focus:border-green-500 focus:ring-2 focus:ring-green-100"
+                    className="w-full pl-10 pr-3 py-3 rounded-xl border border-gray-200 focus:border-green-500 focus:ring-2 focus:ring-green-100 text-gray-900 placeholder:text-gray-400"
                     placeholder="********"
                   />
                 </div>
