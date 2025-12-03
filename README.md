@@ -88,11 +88,43 @@ With storage enabled, the profile page lets users upload an avatar; uploaded fil
    - Reset the button once Firebase confirms both writes.
 4. Reloading the page later pulls the saved `photoUrl`, so the same avatar shows on every visit. Users can repeat the steps at any time to replace the photo.
 
+## Environmental Impact Calculation
+
+The app calculates environmental impact metrics (water saved, trees equivalent, energy conserved) using **category-specific, research-backed values** stored in `frontend/lib/environmental-impact.ts`.
+
+### Impact Metrics by Category
+
+Each waste category has specific environmental impact multipliers based on EPA and EIA research:
+
+- **Paper**: 5.0 L water, 0.003 trees, 2.5 kWh per item
+- **Metal**: 3.0 L water, 0 trees, 3.5 kWh per item  
+- **Glass**: 2.0 L water, 0 trees, 1.0 kWh per item
+- **Plastic**: 1.5 L water, 0 trees, 1.8 kWh per item
+- **Textiles**: 4.0 L water, 0 trees, 2.0 kWh per item
+- **Organic Waste**: 0.5 L water, 0.001 trees, 0.3 kWh per item
+- **Other**: 1.0 L water, 0 trees, 0.5 kWh per item
+
+### Usage
+
+```typescript
+import { calculateEnvironmentalImpact, getCategoryImpact } from '@/lib/environmental-impact';
+
+// Calculate total impact from user statistics
+const impact = calculateEnvironmentalImpact(userStats);
+// Returns: { waterSaved, treesEquivalent, energyConserved }
+
+// Get impact for a specific category
+const paperImpact = getCategoryImpact('Paper');
+```
+
+The dashboard automatically calculates cumulative impact based on the actual categories of items recycled, providing accurate and meaningful metrics.
+
 ## Development Tips
 
 - Keep virtual environments, logs, uploads, datasets, and large binaries out of version control (already handled via `.gitignore`).
 - Use `DEBUG_SUMMARY.md` and `CONNECTION_GUIDE.md` for troubleshooting notes and verifying the frontend ↔ backend flow.
 - When adding new assets or directories that should exist empty (uploads, logs, etc.), drop a `.gitkeep` file so collaborators receive the structure.
+- Environmental impact values are research-backed and documented in `frontend/lib/environmental-impact.ts` with source citations.
 
 With this layout, each subsystem can evolve independently while sharing a single Git history. Let me know if you need additional automation (e.g., root scripts for running both servers).
 

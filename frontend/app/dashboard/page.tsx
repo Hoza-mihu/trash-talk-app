@@ -27,6 +27,7 @@ import {
 } from '@/lib/stats';
 import { useAuth } from '@/context/AuthContext';
 import { getUserStats } from '@/lib/utils';
+import { calculateEnvironmentalImpact } from '@/lib/environmental-impact';
 
 interface AchievementLevel {
   id: string;
@@ -496,32 +497,39 @@ export default function DashboardPage() {
         </div>
 
         {/* Environmental Impact */}
-        <div className="bg-white rounded-xl p-8 shadow-lg mb-8">
-          <h3 className="text-2xl font-bold mb-6 text-gray-900">Your Environmental Impact</h3>
-          <div className="grid md:grid-cols-3 gap-6">
-            <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border-2 border-blue-200">
-              <div className="text-5xl mb-3">🌊</div>
-              <p className="text-3xl font-bold text-blue-900 mb-2">
-                {(userData.totalItems * 2.5).toFixed(0)} L
-              </p>
-              <p className="text-sm text-gray-600 font-medium">Water saved through recycling</p>
+        {(() => {
+          const impact = calculateEnvironmentalImpact(userData);
+          return (
+            <div className="bg-white rounded-xl p-8 shadow-lg mb-8">
+              <h3 className="text-2xl font-bold mb-6 text-gray-900">Your Environmental Impact</h3>
+              <div className="grid md:grid-cols-3 gap-6">
+                <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border-2 border-blue-200">
+                  <div className="text-5xl mb-3">🌊</div>
+                  <p className="text-3xl font-bold text-blue-900 mb-2">
+                    {impact.waterSaved.toFixed(0)} L
+                  </p>
+                  <p className="text-sm text-gray-600 font-medium">Water saved through recycling</p>
+                </div>
+                <div className="text-center p-6 bg-gradient-to-br from-green-50 to-green-100 rounded-xl border-2 border-green-200">
+                  <div className="text-5xl mb-3">🌳</div>
+                  <p className="text-3xl font-bold text-green-900 mb-2">
+                    {impact.treesEquivalent > 0 
+                      ? impact.treesEquivalent.toFixed(2) 
+                      : '—'}
+                  </p>
+                  <p className="text-sm text-gray-600 font-medium">Equivalent trees planted</p>
+                </div>
+                <div className="text-center p-6 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border-2 border-purple-200">
+                  <div className="text-5xl mb-3">⚡</div>
+                  <p className="text-3xl font-bold text-purple-900 mb-2">
+                    {impact.energyConserved.toFixed(0)} kWh
+                  </p>
+                  <p className="text-sm text-gray-600 font-medium">Energy conserved</p>
+                </div>
+              </div>
             </div>
-            <div className="text-center p-6 bg-gradient-to-br from-green-50 to-green-100 rounded-xl border-2 border-green-200">
-              <div className="text-5xl mb-3">🌳</div>
-              <p className="text-3xl font-bold text-green-900 mb-2">
-                {(userData.totalItems * 0.5).toFixed(1)}
-              </p>
-              <p className="text-sm text-gray-600 font-medium">Equivalent trees planted</p>
-            </div>
-            <div className="text-center p-6 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border-2 border-purple-200">
-              <div className="text-5xl mb-3">⚡</div>
-              <p className="text-3xl font-bold text-purple-900 mb-2">
-                {(userData.totalItems * 1.2).toFixed(0)} kWh
-              </p>
-              <p className="text-sm text-gray-600 font-medium">Energy conserved</p>
-            </div>
-          </div>
-        </div>
+          );
+        })()}
 
         {/* Call to Action */}
         <div className="bg-gradient-to-r from-green-100 to-teal-100 rounded-xl p-10 text-center shadow-lg border-2 border-green-200">

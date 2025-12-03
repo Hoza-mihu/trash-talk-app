@@ -82,6 +82,8 @@ export function formatDate(dateString: string) {
 }
 
 // Calculate environmental impact
+// DEPRECATED: Use calculateEnvironmentalImpact from environmental-impact.ts instead
+// This function is kept for backward compatibility but uses outdated hardcoded values
 export function calculateImpact(totalItems: number) {
   return {
     waterSaved: (totalItems * 2.5).toFixed(0), // liters

@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Recycle, Leaf, ArrowLeft, Sparkles, Award } from 'lucide-react';
+import { getCategoryImpact } from '@/lib/environmental-impact';
+import { CATEGORY_KEYS } from '@/lib/stats';
 
 interface AnalysisResult {
   item: string;
@@ -134,23 +136,42 @@ export default function ResultPage() {
         </div>
 
         {/* Impact Stats */}
-        <div className="grid md:grid-cols-3 gap-6 mb-6">
-          <div className="bg-white rounded-xl p-6 shadow-lg text-center hover:shadow-xl transition-shadow">
-            <div className="text-4xl mb-3">🌊</div>
-            <p className="text-2xl font-bold text-blue-600 mb-2">2.5 L</p>
-            <p className="text-sm text-gray-600">Water Saved</p>
-          </div>
-          <div className="bg-white rounded-xl p-6 shadow-lg text-center hover:shadow-xl transition-shadow">
-            <div className="text-4xl mb-3">🌳</div>
-            <p className="text-2xl font-bold text-green-600 mb-2">0.5</p>
-            <p className="text-sm text-gray-600">Trees Equivalent</p>
-          </div>
-          <div className="bg-white rounded-xl p-6 shadow-lg text-center hover:shadow-xl transition-shadow">
-            <div className="text-4xl mb-3">⚡</div>
-            <p className="text-2xl font-bold text-purple-600 mb-2">1.2 kWh</p>
-            <p className="text-sm text-gray-600">Energy Conserved</p>
-          </div>
-        </div>
+        {(() => {
+          // Get category-specific environmental impact
+          // Normalize the item name to match category keys (case-insensitive)
+          const normalizedCategory = CATEGORY_KEYS.find(
+            (key) => key.toLowerCase() === result.item.toLowerCase()
+          ) || 'Other';
+          const impact = getCategoryImpact(normalizedCategory);
+          
+          return (
+            <div className="grid md:grid-cols-3 gap-6 mb-6">
+              <div className="bg-white rounded-xl p-6 shadow-lg text-center hover:shadow-xl transition-shadow">
+                <div className="text-4xl mb-3">🌊</div>
+                <p className="text-2xl font-bold text-blue-600 mb-2">
+                  {impact.waterSaved.toFixed(1)} L
+                </p>
+                <p className="text-sm text-gray-600">Water Saved</p>
+              </div>
+              <div className="bg-white rounded-xl p-6 shadow-lg text-center hover:shadow-xl transition-shadow">
+                <div className="text-4xl mb-3">🌳</div>
+                <p className="text-2xl font-bold text-green-600 mb-2">
+                  {impact.treesEquivalent > 0 
+                    ? impact.treesEquivalent.toFixed(3) 
+                    : '—'}
+                </p>
+                <p className="text-sm text-gray-600">Trees Equivalent</p>
+              </div>
+              <div className="bg-white rounded-xl p-6 shadow-lg text-center hover:shadow-xl transition-shadow">
+                <div className="text-4xl mb-3">⚡</div>
+                <p className="text-2xl font-bold text-purple-600 mb-2">
+                  {impact.energyConserved.toFixed(1)} kWh
+                </p>
+                <p className="text-sm text-gray-600">Energy Conserved</p>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Achievement Badge */}
         <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl p-6 shadow-lg mb-6 border-2 border-yellow-200">
