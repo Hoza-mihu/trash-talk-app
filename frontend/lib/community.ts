@@ -1144,10 +1144,13 @@ export async function deletePost(postId: string, userId: string): Promise<void> 
       where('postId', '==', postId)
     );
     const commentsSnapshot = await getDocs(commentsQuery);
-    const deleteCommentPromises = commentsSnapshot.docs.map(commentDoc =>
-      deleteDoc(doc(db, 'comments', commentDoc.id))
-    );
-    await Promise.all(deleteCommentPromises);
+    if (commentsSnapshot.docs.length > 0) {
+      const deleteCommentPromises = commentsSnapshot.docs.map(commentDoc =>
+        deleteDoc(doc(db, 'comments', commentDoc.id))
+      );
+      await Promise.all(deleteCommentPromises);
+      console.log(`Deleted ${commentsSnapshot.docs.length} comments for post ${postId}`);
+    }
 
     // Delete all votes for this post
     const votesQuery = query(
@@ -1155,10 +1158,13 @@ export async function deletePost(postId: string, userId: string): Promise<void> 
       where('postId', '==', postId)
     );
     const votesSnapshot = await getDocs(votesQuery);
-    const deleteVotePromises = votesSnapshot.docs.map(voteDoc =>
-      deleteDoc(doc(db, 'votes', voteDoc.id))
-    );
-    await Promise.all(deleteVotePromises);
+    if (votesSnapshot.docs.length > 0) {
+      const deleteVotePromises = votesSnapshot.docs.map(voteDoc =>
+        deleteDoc(doc(db, 'votes', voteDoc.id))
+      );
+      await Promise.all(deleteVotePromises);
+      console.log(`Deleted ${votesSnapshot.docs.length} votes for post ${postId}`);
+    }
 
     // Decrement post count in community if post belongs to a community
     if (postData.communityId) {
@@ -1167,10 +1173,19 @@ export async function deletePost(postId: string, userId: string): Promise<void> 
         postCount: increment(-1),
         updatedAt: serverTimestamp()
       });
+      console.log(`Decremented post count for community ${postData.communityId}`);
     }
 
-    // Finally delete the post
+    // Finally delete the post document itself - THIS IS THE CRITICAL STEP
     await deleteDoc(postRef);
+    
+    // Verify deletion
+    const verifySnap = await getDoc(postRef);
+    if (verifySnap.exists()) {
+      throw new Error('Post deletion failed - post still exists in database');
+    }
+    
+    console.log(`Post ${postId} successfully deleted from Firestore`);
   } catch (error) {
     console.error('Error deleting post:', error);
     throw error;

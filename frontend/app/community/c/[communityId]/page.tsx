@@ -524,8 +524,11 @@ export default function CommunityPage() {
 
     setDeletingPostId(postId);
     try {
+      console.log(`Deleting post ${postId}...`);
       await deletePost(postId, user.uid);
+      console.log(`Post ${postId} deleted successfully`);
       // Posts will automatically update via real-time subscription
+      // The subscription will detect the deletion and remove it from the list
     } catch (error: any) {
       console.error('Error deleting post:', error);
       alert(error.message || 'Failed to delete post. Please try again.');

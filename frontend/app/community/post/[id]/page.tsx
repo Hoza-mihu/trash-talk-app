@@ -150,8 +150,13 @@ export default function PostDetailPage() {
     setDeleting(true);
     try {
       await deletePost(postId, user.uid);
-      alert('Post deleted successfully!');
-      router.push('/community');
+      console.log('Post deletion completed, redirecting...');
+      // Redirect to community page or back to community if post was in a community
+      if (post?.communityId) {
+        router.push(`/community/c/${post.communityId}`);
+      } else {
+        router.push('/community');
+      }
     } catch (error: any) {
       console.error('Error deleting post:', error);
       alert(error.message || 'Failed to delete post. Please try again.');
