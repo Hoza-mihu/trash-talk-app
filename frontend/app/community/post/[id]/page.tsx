@@ -169,7 +169,7 @@ export default function PostDetailPage() {
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
                   placeholder="Write a reply..."
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 mb-2 text-gray-900 placeholder:text-gray-400"
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 mb-2 !text-black placeholder:text-gray-400"
                   rows={3}
                 />
                 <div className="flex gap-2">
@@ -337,7 +337,7 @@ export default function PostDetailPage() {
                 value={commentText}
                 onChange={(e) => setCommentText(e.target.value)}
                 placeholder={replyingTo ? "Write a reply..." : "Add a comment..."}
-                className="w-full p-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 mb-4 text-gray-900 placeholder:text-gray-400"
+                className="w-full p-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 mb-4 !text-black placeholder:text-gray-400"
                 rows={4}
                 required
               />

@@ -143,7 +143,7 @@ function CreatePostForm() {
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value as WasteCategoryKey)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 !text-black"
               >
                 {CATEGORY_KEYS.map(cat => (
                   <option key={cat} value={cat}>{cat}</option>
@@ -175,7 +175,7 @@ function CreatePostForm() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Enter post title..."
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900 placeholder:text-gray-400"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 !text-black placeholder:text-gray-400"
                 required
                 maxLength={200}
               />
@@ -190,7 +190,7 @@ function CreatePostForm() {
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 placeholder="Share your tip, question, or experience..."
-                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900 placeholder:text-gray-400"
+                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 !text-black placeholder:text-gray-400"
                 rows={10}
                 required
               />
