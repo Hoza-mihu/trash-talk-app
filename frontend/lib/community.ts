@@ -13,9 +13,12 @@ import {
   Timestamp,
   serverTimestamp,
   QueryDocumentSnapshot,
-  DocumentData
+  DocumentData,
+  setDoc,
+  getDoc as getFirestoreDoc
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from './firebase';
 import { WasteCategoryKey } from './stats';
 
 export interface CommunityPost {
@@ -47,6 +50,8 @@ export interface Comment {
   downvotes: number;
   createdAt: Timestamp | Date;
   parentId?: string; // For nested comments/replies
+  replyCount?: number;
+  replies?: Comment[]; // Nested replies
 }
 
 export interface Vote {
@@ -189,28 +194,82 @@ export async function getPostById(postId: string): Promise<CommunityPost | null>
   }
 }
 
-// Vote on a post
+// Check if user has voted on a post
+export async function getUserVote(postId: string, userId: string): Promise<'upvote' | 'downvote' | null> {
+  try {
+    const voteRef = doc(db, 'votes', `${postId}_${userId}`);
+    const voteSnap = await getFirestoreDoc(voteRef);
+    
+    if (voteSnap.exists()) {
+      return voteSnap.data().type as 'upvote' | 'downvote';
+    }
+    return null;
+  } catch (error) {
+    console.error('Error checking user vote:', error);
+    return null;
+  }
+}
+
+// Vote on a post (with tracking to prevent duplicate votes)
 export async function voteOnPost(
   postId: string,
   userId: string,
   voteType: 'upvote' | 'downvote'
 ): Promise<void> {
   try {
+    const voteRef = doc(db, 'votes', `${postId}_${userId}`);
+    const voteSnap = await getFirestoreDoc(voteRef);
     const postRef = doc(db, 'community_posts', postId);
+    const postSnap = await getFirestoreDoc(postRef);
     
-    // Check if user already voted (you might want to track this in a separate collection)
-    // For simplicity, we'll just increment/decrement
+    if (!postSnap.exists()) {
+      throw new Error('Post not found');
+    }
+    
+    const existingVote = voteSnap.exists() ? voteSnap.data().type : null;
+    const postData = postSnap.data();
+    
+    // If user already voted the same way, remove the vote
+    if (existingVote === voteType) {
+      // Remove vote
+      await updateDoc(postRef, {
+        [voteType === 'upvote' ? 'upvotes' : 'downvotes']: increment(-1),
+        updatedAt: serverTimestamp()
+      });
+      // Delete vote record
+      await updateDoc(voteRef, { type: null });
+      return;
+    }
+    
+    // If user voted opposite way, switch the vote
+    if (existingVote && existingVote !== voteType) {
+      // Remove old vote
+      await updateDoc(postRef, {
+        [existingVote === 'upvote' ? 'upvotes' : 'downvotes']: increment(-1),
+        updatedAt: serverTimestamp()
+      });
+    }
+    
+    // Add new vote
     await updateDoc(postRef, {
       [voteType === 'upvote' ? 'upvotes' : 'downvotes']: increment(1),
       updatedAt: serverTimestamp()
     });
+    
+    // Record the vote
+    await setDoc(voteRef, {
+      postId,
+      userId,
+      type: voteType,
+      createdAt: serverTimestamp()
+    }, { merge: true });
   } catch (error) {
     console.error('Error voting on post:', error);
     throw error;
   }
 }
 
-// Add comment to post
+// Add comment to post (supports nested replies)
 export async function addComment(
   postId: string,
   userId: string,
@@ -229,8 +288,17 @@ export async function addComment(
       upvotes: 0,
       downvotes: 0,
       parentId: parentId || null,
+      replyCount: 0,
       createdAt: serverTimestamp()
     });
+    
+    // If this is a reply, increment parent comment's reply count
+    if (parentId) {
+      const parentRef = doc(db, 'comments', parentId);
+      await updateDoc(parentRef, {
+        replyCount: increment(1)
+      });
+    }
     
     // Update post comment count
     const postRef = doc(db, 'community_posts', postId);
@@ -246,14 +314,59 @@ export async function addComment(
   }
 }
 
-// Get comments for a post
+// Get comments for a post (with nested replies)
 export async function getCommentsByPostId(postId: string): Promise<Comment[]> {
   try {
+    // Get all comments for this post
     const q = query(
       collection(db, 'comments'),
       where('postId', '==', postId),
-      where('parentId', '==', null), // Only top-level comments
-      orderBy('createdAt', 'desc')
+      orderBy('createdAt', 'asc')
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const allComments = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as Comment & { replyCount?: number }));
+    
+    // Organize into tree structure
+    const commentMap = new Map<string, Comment & { replies?: Comment[] }>();
+    const rootComments: (Comment & { replies?: Comment[] })[] = [];
+    
+    // First pass: create map of all comments
+    allComments.forEach(comment => {
+      commentMap.set(comment.id!, { ...comment, replies: [] });
+    });
+    
+    // Second pass: build tree
+    allComments.forEach(comment => {
+      const commentWithReplies = commentMap.get(comment.id!)!;
+      if (comment.parentId) {
+        const parent = commentMap.get(comment.parentId);
+        if (parent) {
+          if (!parent.replies) parent.replies = [];
+          parent.replies.push(commentWithReplies);
+        }
+      } else {
+        rootComments.push(commentWithReplies);
+      }
+    });
+    
+    return rootComments;
+  } catch (error) {
+    console.error('Error fetching comments:', error);
+    return [];
+  }
+}
+
+// Get replies for a comment
+export async function getCommentReplies(commentId: string): Promise<Comment[]> {
+  try {
+    const q = query(
+      collection(db, 'comments'),
+      where('parentId', '==', commentId),
+      orderBy('createdAt', 'asc')
     );
     
     const querySnapshot = await getDocs(q);
@@ -262,8 +375,98 @@ export async function getCommentsByPostId(postId: string): Promise<Comment[]> {
       ...doc.data()
     } as Comment));
   } catch (error) {
-    console.error('Error fetching comments:', error);
+    console.error('Error fetching replies:', error);
     return [];
+  }
+}
+
+// Search posts by keyword
+export async function searchPosts(searchTerm: string, limitCount: number = 20): Promise<CommunityPost[]> {
+  try {
+    // Get all posts and filter client-side (Firestore doesn't support full-text search)
+    // For production, consider using Algolia or similar
+    const q = query(
+      collection(db, 'community_posts'),
+      orderBy('createdAt', 'desc'),
+      limit(100) // Get more to filter
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const searchLower = searchTerm.toLowerCase();
+    
+    return querySnapshot.docs
+      .map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as CommunityPost))
+      .filter(post => 
+        post.title.toLowerCase().includes(searchLower) ||
+        post.content.toLowerCase().includes(searchLower) ||
+        post.tags?.some(tag => tag.toLowerCase().includes(searchLower))
+      )
+      .slice(0, limitCount);
+  } catch (error) {
+    console.error('Error searching posts:', error);
+    return [];
+  }
+}
+
+// Get posts by user
+export async function getPostsByUser(userId: string, limitCount: number = 20): Promise<CommunityPost[]> {
+  try {
+    const q = query(
+      collection(db, 'community_posts'),
+      where('authorId', '==', userId),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as CommunityPost));
+  } catch (error) {
+    console.error('Error fetching user posts:', error);
+    return [];
+  }
+}
+
+// Get comments by user
+export async function getCommentsByUser(userId: string, limitCount: number = 20): Promise<Comment[]> {
+  try {
+    const q = query(
+      collection(db, 'comments'),
+      where('authorId', '==', userId),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as Comment));
+  } catch (error) {
+    console.error('Error fetching user comments:', error);
+    return [];
+  }
+}
+
+// Upload image to Firebase Storage
+export async function uploadPostImage(file: File, userId: string): Promise<string> {
+  try {
+    const timestamp = Date.now();
+    const fileName = `community/${userId}/${timestamp}_${file.name}`;
+    const storageRef = ref(storage, fileName);
+    
+    await uploadBytes(storageRef, file);
+    const downloadURL = await getDownloadURL(storageRef);
+    
+    return downloadURL;
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    throw error;
   }
 }
 

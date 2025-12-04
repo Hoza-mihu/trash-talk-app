@@ -78,8 +78,13 @@ function CreatePostForm() {
 
     setSubmitting(true);
     try {
-      // TODO: Upload image to Firebase Storage if imageFile exists
-      const imageUrl = null; // Placeholder for image upload
+      let imageUrl: string | undefined = undefined;
+      
+      // Upload image to Firebase Storage if provided
+      if (imageFile) {
+        const { uploadPostImage } = await import('@/lib/community');
+        imageUrl = await uploadPostImage(imageFile, user.uid);
+      }
 
       await createPost(
         user.uid,
@@ -90,7 +95,7 @@ function CreatePostForm() {
           content: content.trim(),
           category,
           isTip,
-          imageUrl: imageUrl || undefined,
+          imageUrl,
           tags: isTip ? ['tip', category.toLowerCase()] : [category.toLowerCase()]
         }
       );

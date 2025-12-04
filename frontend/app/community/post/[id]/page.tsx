@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, MessageSquare, ThumbsUp, ThumbsDown, Leaf, Send } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { getPostById, addComment, getCommentsByPostId, voteOnPost, Comment } from '@/lib/community';
+import { getPostById, addComment, getCommentsByPostId, voteOnPost, getUserVote, Comment } from '@/lib/community';
 import { CommunityPost } from '@/lib/community';
 import { CATEGORY_COLORS } from '@/lib/stats';
 
@@ -19,14 +19,30 @@ export default function PostDetailPage() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [commentText, setCommentText] = useState('');
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [userVote, setUserVote] = useState<'upvote' | 'downvote' | null>(null);
 
   useEffect(() => {
     if (postId) {
       loadPost();
       loadComments();
+      if (user) {
+        loadUserVote();
+      }
     }
-  }, [postId]);
+  }, [postId, user]);
+
+  const loadUserVote = async () => {
+    if (!user) return;
+    try {
+      const vote = await getUserVote(postId, user.uid);
+      setUserVote(vote);
+    } catch (error) {
+      console.error('Error loading user vote:', error);
+    }
+  };
 
   const loadPost = async () => {
     try {
@@ -59,13 +75,39 @@ export default function PostDetailPage() {
         user.uid,
         user.displayName || 'Anonymous',
         user.photoURL,
-        commentText
+        commentText,
+        replyingTo || undefined
       );
       setCommentText('');
+      setReplyingTo(null);
       await loadComments();
     } catch (error) {
       console.error('Error submitting comment:', error);
       alert('Failed to post comment. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSubmitReply = async (parentId: string) => {
+    if (!user || !replyText.trim()) return;
+
+    setSubmitting(true);
+    try {
+      await addComment(
+        postId,
+        user.uid,
+        user.displayName || 'Anonymous',
+        user.photoURL,
+        replyText,
+        parentId
+      );
+      setReplyText('');
+      setReplyingTo(null);
+      await loadComments();
+    } catch (error) {
+      console.error('Error submitting reply:', error);
+      alert('Failed to post reply. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -80,9 +122,87 @@ export default function PostDetailPage() {
     try {
       await voteOnPost(postId, user.uid, type);
       await loadPost(); // Reload to get updated vote counts
+      await loadUserVote(); // Reload user's vote status
     } catch (error) {
       console.error('Error voting:', error);
     }
+  };
+
+  const renderComment = (comment: Comment, depth: number = 0) => {
+    const isReplying = replyingTo === comment.id;
+    
+    return (
+      <div key={comment.id} className={depth > 0 ? 'ml-8 mt-4 border-l-2 border-gray-200 pl-4' : 'border-b border-gray-200 pb-6 last:border-0'}>
+        <div className="flex gap-4">
+          {comment.authorPhotoUrl ? (
+            <img
+              src={comment.authorPhotoUrl}
+              alt={comment.authorName}
+              className="w-10 h-10 rounded-full"
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+              <span className="text-green-600 font-bold">
+                {comment.authorName.charAt(0).toUpperCase()}
+              </span>
+            </div>
+          )}
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="font-semibold text-gray-900">{comment.authorName}</span>
+              <span className="text-sm text-gray-500">{formatDate(comment.createdAt)}</span>
+            </div>
+            <p className="text-gray-700 whitespace-pre-line mb-3">{comment.content}</p>
+            
+            {user && (
+              <button
+                onClick={() => setReplyingTo(isReplying ? null : comment.id || null)}
+                className="text-sm text-green-600 hover:text-green-700 font-medium"
+              >
+                {isReplying ? 'Cancel' : 'Reply'}
+              </button>
+            )}
+            
+            {isReplying && (
+              <div className="mt-3">
+                <textarea
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  placeholder="Write a reply..."
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 mb-2"
+                  rows={3}
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleSubmitReply(comment.id!)}
+                    disabled={submitting || !replyText.trim()}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
+                  >
+                    Post Reply
+                  </button>
+                  <button
+                    onClick={() => {
+                      setReplyingTo(null);
+                      setReplyText('');
+                    }}
+                    className="px-4 py-2 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+            
+            {/* Render nested replies */}
+            {comment.replies && comment.replies.length > 0 && (
+              <div className="mt-4">
+                {comment.replies.map(reply => renderComment(reply, depth + 1))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const formatDate = (date: any) => {
@@ -145,14 +265,22 @@ export default function PostDetailPage() {
             <div className="flex flex-col items-center gap-2">
               <button
                 onClick={() => handleVote('upvote')}
-                className="text-gray-400 hover:text-green-600 transition-colors text-2xl"
+                className={`transition-colors text-2xl ${
+                  userVote === 'upvote' 
+                    ? 'text-green-600' 
+                    : 'text-gray-400 hover:text-green-600'
+                }`}
               >
                 ▲
               </button>
               <span className="font-bold text-xl text-gray-900">{post.upvotes - post.downvotes}</span>
               <button
                 onClick={() => handleVote('downvote')}
-                className="text-gray-400 hover:text-red-600 transition-colors text-2xl"
+                className={`transition-colors text-2xl ${
+                  userVote === 'downvote' 
+                    ? 'text-red-600' 
+                    : 'text-gray-400 hover:text-red-600'
+                }`}
               >
                 ▼
               </button>
@@ -208,19 +336,33 @@ export default function PostDetailPage() {
               <textarea
                 value={commentText}
                 onChange={(e) => setCommentText(e.target.value)}
-                placeholder="Add a comment..."
+                placeholder={replyingTo ? "Write a reply..." : "Add a comment..."}
                 className="w-full p-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 mb-4"
                 rows={4}
                 required
               />
-              <button
-                type="submit"
-                disabled={submitting || !commentText.trim()}
-                className="flex items-center gap-2 bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Send className="w-5 h-5" />
-                {submitting ? 'Posting...' : 'Post Comment'}
-              </button>
+              <div className="flex items-center gap-4">
+                <button
+                  type="submit"
+                  disabled={submitting || !commentText.trim()}
+                  className="flex items-center gap-2 bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Send className="w-5 h-5" />
+                  {submitting ? 'Posting...' : replyingTo ? 'Post Reply' : 'Post Comment'}
+                </button>
+                {replyingTo && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReplyingTo(null);
+                      setCommentText('');
+                    }}
+                    className="px-4 py-2 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
             </form>
           ) : (
             <div className="mb-8 p-4 bg-gray-50 rounded-lg text-center">
@@ -236,32 +378,7 @@ export default function PostDetailPage() {
             <p className="text-gray-500 text-center py-8">No comments yet. Be the first to comment!</p>
           ) : (
             <div className="space-y-6">
-              {comments.map((comment) => (
-                <div key={comment.id} className="border-b border-gray-200 pb-6 last:border-0">
-                  <div className="flex gap-4">
-                    {comment.authorPhotoUrl ? (
-                      <img
-                        src={comment.authorPhotoUrl}
-                        alt={comment.authorName}
-                        className="w-10 h-10 rounded-full"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                        <span className="text-green-600 font-bold">
-                          {comment.authorName.charAt(0).toUpperCase()}
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="font-semibold text-gray-900">{comment.authorName}</span>
-                        <span className="text-sm text-gray-500">{formatDate(comment.createdAt)}</span>
-                      </div>
-                      <p className="text-gray-700 whitespace-pre-line">{comment.content}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
+              {comments.map((comment) => renderComment(comment))}
             </div>
           )}
         </div>

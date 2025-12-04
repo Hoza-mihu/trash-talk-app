@@ -3,9 +3,9 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { MessageSquare, TrendingUp, Plus, Leaf, Filter } from 'lucide-react';
+import { MessageSquare, TrendingUp, Plus, Leaf, Filter, Search } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { getAllPosts, getPopularPosts, CommunityPost } from '@/lib/community';
+import { getAllPosts, getPopularPosts, searchPosts, CommunityPost } from '@/lib/community';
 import { CATEGORY_KEYS, CATEGORY_COLORS, WasteCategoryKey } from '@/lib/stats';
 
 export default function CommunityPage() {
@@ -13,11 +13,17 @@ export default function CommunityPage() {
   const router = useRouter();
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sortBy, setSortBy] = useState<'recent' | 'popular'>('recent');
+  const [sortBy, setSortBy] = useState<'recent' | 'popular' | 'search'>('recent');
   const [selectedCategory, setSelectedCategory] = useState<WasteCategoryKey | 'all'>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
-    loadPosts();
+    if (sortBy === 'search' && searchTerm.trim()) {
+      handleSearch();
+    } else {
+      loadPosts();
+    }
   }, [sortBy, selectedCategory]);
 
   const loadPosts = async () => {
@@ -41,6 +47,33 @@ export default function CommunityPage() {
       console.error('Error loading posts:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSearch = async () => {
+    if (!searchTerm.trim()) {
+      setSortBy('recent');
+      loadPosts();
+      return;
+    }
+
+    setIsSearching(true);
+    setLoading(true);
+    try {
+      const results = await searchPosts(searchTerm, 50);
+      
+      // Filter by category if selected
+      const filtered = selectedCategory !== 'all' 
+        ? results.filter(post => post.category === selectedCategory)
+        : results;
+      
+      setPosts(filtered);
+      setSortBy('search');
+    } catch (error) {
+      console.error('Error searching posts:', error);
+    } finally {
+      setLoading(false);
+      setIsSearching(false);
     }
   };
 
@@ -87,12 +120,52 @@ export default function CommunityPage() {
           <p className="text-gray-600">Share tips, ask questions, and connect with eco-warriors!</p>
         </div>
 
+        {/* Search Bar */}
+        <div className="bg-white rounded-xl p-6 shadow-sm mb-6">
+          <div className="flex gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                placeholder="Search posts by title, content, or tags..."
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+            <button
+              onClick={handleSearch}
+              disabled={isSearching}
+              className="px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:opacity-50"
+            >
+              {isSearching ? 'Searching...' : 'Search'}
+            </button>
+            {searchTerm && (
+              <button
+                onClick={() => {
+                  setSearchTerm('');
+                  setSortBy('recent');
+                  loadPosts();
+                }}
+                className="px-4 py-3 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Controls */}
         <div className="bg-white rounded-xl p-6 shadow-sm mb-6">
           <div className="flex flex-wrap gap-4 items-center justify-between">
             <div className="flex gap-4 items-center">
               <button
-                onClick={() => setSortBy('recent')}
+                onClick={() => {
+                  setSortBy('recent');
+                  setSearchTerm('');
+                  loadPosts();
+                }}
                 className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                   sortBy === 'recent'
                     ? 'bg-green-600 text-white'
@@ -102,7 +175,11 @@ export default function CommunityPage() {
                 Recent
               </button>
               <button
-                onClick={() => setSortBy('popular')}
+                onClick={() => {
+                  setSortBy('popular');
+                  setSearchTerm('');
+                  loadPosts();
+                }}
                 className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                   sortBy === 'popular'
                     ? 'bg-green-600 text-white'
@@ -211,7 +288,13 @@ export default function CommunityPage() {
                     <h3 className="text-xl font-bold text-gray-900 mb-2">{post.title}</h3>
                     <p className="text-gray-700 mb-4 line-clamp-2">{post.content}</p>
                     <div className="flex items-center gap-4 text-sm text-gray-500">
-                      <span>by {post.authorName}</span>
+                      <Link
+                        href={`/community/user/${post.authorId}`}
+                        className="hover:text-green-600 transition-colors"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        by {post.authorName}
+                      </Link>
                       <span className="flex items-center gap-1">
                         <MessageSquare className="w-4 h-4" />
                         {post.commentCount} comments
