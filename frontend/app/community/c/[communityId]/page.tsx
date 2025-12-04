@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Leaf, Users, Plus, MessageSquare, TrendingUp, Filter, Trash2, Bell, MoreHorizontal, Clock, Flame, Trophy, LayoutGrid, List, Edit2, Image as ImageIcon, X, Star, Bookmark, VolumeX, Rocket, Check } from 'lucide-react';
+import { ArrowLeft, Leaf, Users, Plus, MessageSquare, TrendingUp, Filter, Trash2, Bell, MoreHorizontal, Clock, Flame, Trophy, LayoutGrid, List, Edit2, Image as ImageIcon, X, Star, Bookmark, VolumeX, Rocket, Check, Sparkles, Home } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import {
   getCommunityById,
@@ -22,6 +22,8 @@ import {
   markNotificationAsRead,
   markAllNotificationsAsRead,
   subscribeToNotifications,
+  getUserCommunities,
+  getPopularCommunities,
   Community,
   CommunityPost,
   Notification
@@ -62,6 +64,8 @@ export default function CommunityPage() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
   const [notificationPreference, setNotificationPreference] = useState<'all' | 'popular' | 'off' | 'mute'>('all');
+  const [userCommunities, setUserCommunities] = useState<Community[]>([]);
+  const [popularCommunities, setPopularCommunities] = useState<Community[]>([]);
 
   useEffect(() => {
     if (communityId) {
@@ -92,6 +96,18 @@ export default function CommunityPage() {
       }
     }
   }, [communityId, sortOption, user]);
+
+  // Reload posts when returning from create post page
+  useEffect(() => {
+    const handleFocus = () => {
+      if (communityId) {
+        loadPosts();
+        loadHighlights();
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [communityId]);
 
   const loadNotifications = async () => {
     if (!user) return;
@@ -175,6 +191,25 @@ export default function CommunityPage() {
     }
   };
 
+  const loadUserCommunities = async () => {
+    if (!user) return;
+    try {
+      const fetched = await getUserCommunities(user.uid);
+      setUserCommunities(fetched);
+    } catch (error) {
+      console.error('Error loading user communities:', error);
+    }
+  };
+
+  const loadPopularCommunities = async () => {
+    try {
+      const fetched = await getPopularCommunities(10);
+      setPopularCommunities(fetched);
+    } catch (error) {
+      console.error('Error loading popular communities:', error);
+    }
+  };
+
   const handleToggleFavorite = () => {
     if (!user) return;
     const favorites = JSON.parse(localStorage.getItem('favoriteCommunities') || '[]');
@@ -230,7 +265,26 @@ export default function CommunityPage() {
           });
           break;
         case 'new':
-          // Already sorted by createdAt desc from query
+          // Sort by createdAt (most recent first)
+          sortedPosts.sort((a, b) => {
+            const getTime = (date: any): number => {
+              if (!date) return 0;
+              if (date.toMillis && typeof date.toMillis === 'function') {
+                return date.toMillis();
+              }
+              if (date instanceof Date) {
+                return date.getTime();
+              }
+              try {
+                return new Date(date).getTime();
+              } catch {
+                return 0;
+              }
+            };
+            const aTime = getTime(a.createdAt);
+            const bTime = getTime(b.createdAt);
+            return bTime - aTime;
+          });
           break;
         case 'top':
           // Sort by highest score (upvotes - downvotes)
@@ -492,8 +546,104 @@ export default function CommunityPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 px-4 py-4">
+          {/* Left Sidebar */}
+          <aside className="hidden lg:block lg:col-span-2 space-y-4">
+            <div className="bg-white rounded-lg border border-gray-200 p-4 sticky top-20 space-y-4">
+              <div>
+                <Link href="/" className="flex items-center gap-2 mb-4 text-gray-700 hover:text-green-600 transition-colors">
+                  <Leaf className="w-5 h-5" />
+                  <span className="font-semibold">Eco-Eco</span>
+                </Link>
+                <nav className="space-y-1">
+                  <Link href="/" className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+                    <Home className="w-4 h-4" />
+                    Home
+                  </Link>
+                  <Link href="/community" className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+                    <TrendingUp className="w-4 h-4" />
+                    Popular
+                  </Link>
+                  <Link href="/community" className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+                    <Sparkles className="w-4 h-4" />
+                    All
+                  </Link>
+                </nav>
+              </div>
+
+              {user && (
+                <>
+                  <div className="pt-4 border-t border-gray-200">
+                    <Link
+                      href="/community/create-community"
+                      className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors w-full"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Start a community
+                    </Link>
+                  </div>
+
+                  {userCommunities.length > 0 && (
+                    <div className="pt-4 border-t border-gray-200">
+                      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2 px-2">Your Communities</h4>
+                      <div className="space-y-1 max-h-64 overflow-y-auto">
+                        {userCommunities.slice(0, 10).map((comm) => (
+                          <Link
+                            key={comm.id}
+                            href={`/community/c/${comm.id}`}
+                            className="flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                          >
+                            {comm.iconUrl || comm.imageUrl ? (
+                              <img
+                                src={comm.iconUrl || comm.imageUrl}
+                                alt={comm.name}
+                                className="w-5 h-5 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-5 h-5 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                                {comm.name.charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                            <span className="truncate">r/{comm.name}</span>
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {popularCommunities.length > 0 && (
+                    <div className="pt-4 border-t border-gray-200">
+                      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2 px-2">Popular Communities</h4>
+                      <div className="space-y-1 max-h-64 overflow-y-auto">
+                        {popularCommunities.filter(c => c.id !== communityId).slice(0, 5).map((comm) => (
+                          <Link
+                            key={comm.id}
+                            href={`/community/c/${comm.id}`}
+                            className="flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                          >
+                            {comm.iconUrl || comm.imageUrl ? (
+                              <img
+                                src={comm.iconUrl || comm.imageUrl}
+                                alt={comm.name}
+                                className="w-5 h-5 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-5 h-5 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                                {comm.name.charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                            <span className="truncate">r/{comm.name}</span>
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </aside>
+
           {/* Main Content */}
-          <main className="lg:col-span-8 space-y-4">
+          <main className="lg:col-span-7 space-y-4">
             {/* Community Header */}
             <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
               <div className="p-4">
@@ -1001,8 +1151,8 @@ export default function CommunityPage() {
             )}
           </main>
 
-          {/* Sidebar */}
-          <aside className="lg:col-span-4 space-y-4">
+          {/* Right Sidebar */}
+          <aside className="lg:col-span-3 space-y-4">
             {/* Community Info */}
             <div className="bg-white rounded-lg border border-gray-200 p-4 sticky top-20 space-y-4">
               <div>
