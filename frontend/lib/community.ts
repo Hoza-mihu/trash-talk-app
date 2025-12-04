@@ -1091,7 +1091,7 @@ export async function deleteCommunity(communityId: string, userId: string): Prom
   }
 }
 
-// Delete a post (only by author)
+// Delete a post (by author or community creator)
 export async function deletePost(postId: string, userId: string): Promise<void> {
   try {
     const postRef = doc(db, 'community_posts', postId);
@@ -1102,8 +1102,23 @@ export async function deletePost(postId: string, userId: string): Promise<void> 
     }
 
     const postData = postSnap.data() as CommunityPost;
-    if (postData.authorId !== userId) {
-      throw new Error('Only the author can delete this post');
+    
+    // Check if user is the post author
+    const isAuthor = postData.authorId === userId;
+    
+    // Check if user is the community creator (if post belongs to a community)
+    let isCommunityCreator = false;
+    if (postData.communityId) {
+      const communityRef = doc(db, 'communities', postData.communityId);
+      const communitySnap = await getDoc(communityRef);
+      if (communitySnap.exists()) {
+        const communityData = communitySnap.data() as Community;
+        isCommunityCreator = communityData.creatorId === userId;
+      }
+    }
+    
+    if (!isAuthor && !isCommunityCreator) {
+      throw new Error('Only the author or community creator can delete this post');
     }
 
     // Delete post image from storage if exists

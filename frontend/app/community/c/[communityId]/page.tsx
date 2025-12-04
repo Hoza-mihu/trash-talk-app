@@ -15,6 +15,7 @@ import {
   getCommunityMembership,
   updateNotificationPreference,
   deleteCommunity,
+  deletePost,
   updateCommunityImages,
   uploadCommunityBanner,
   uploadCommunityIcon,
@@ -46,6 +47,7 @@ export default function CommunityPage() {
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
   const [sortOption, setSortOption] = useState<SortOption>('best');
   const [viewOption, setViewOption] = useState<ViewOption>('card');
   const [editingImages, setEditingImages] = useState(false);
@@ -507,6 +509,28 @@ export default function CommunityPage() {
       console.error('Error deleting community:', error);
       alert(error.message || 'Failed to delete community. Please try again.');
       setDeleting(false);
+    }
+  };
+
+  const handleDeletePost = async (postId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!user) return;
+    
+    if (!confirm('Are you sure you want to delete this post? This will also delete all comments. This action cannot be undone.')) {
+      return;
+    }
+
+    setDeletingPostId(postId);
+    try {
+      await deletePost(postId, user.uid);
+      // Posts will automatically update via real-time subscription
+    } catch (error: any) {
+      console.error('Error deleting post:', error);
+      alert(error.message || 'Failed to delete post. Please try again.');
+    } finally {
+      setDeletingPostId(null);
     }
   };
 
@@ -1172,82 +1196,102 @@ export default function CommunityPage() {
               </div>
             ) : (
               <div className="space-y-2">
-                {posts.map((post) => (
-                  <Link
-                    key={post.id}
-                    href={`/community/post/${post.id}`}
-                    className="block bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
-                  >
-                    <div className="flex gap-3 p-3">
-                      {/* Voting */}
-                      <div className="flex flex-col items-center gap-1 pt-1">
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            // Handle upvote
-                          }}
-                          className="text-gray-400 hover:text-green-600 transition-colors text-lg leading-none"
-                        >
-                          ▲
-                        </button>
-                        <span className="font-bold text-gray-900 text-xs">{post.upvotes - post.downvotes}</span>
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            // Handle downvote
-                          }}
-                          className="text-gray-400 hover:text-red-600 transition-colors text-lg leading-none"
-                        >
-                          ▼
-                        </button>
-                      </div>
-
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          {post.isTip && (
-                            <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
-                              💡 Tip
-                            </span>
-                          )}
-                          <Link
-                            href={`/community/user/${post.authorId}`}
-                            className="text-xs text-gray-500 hover:text-green-600 transition-colors font-medium"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            u/{post.authorName}
-                          </Link>
-                          <span className="text-xs text-gray-400">•</span>
-                          <span className="text-xs text-gray-500">{formatDate(post.createdAt)}</span>
-                        </div>
-                        <h3 className="text-base font-semibold text-gray-900 mb-2 line-clamp-2 hover:text-green-600 transition-colors">
-                          {post.title}
-                        </h3>
-                        {viewOption === 'card' && post.imageUrl && (
-                          <div className="mb-2">
-                            <img 
-                              src={post.imageUrl} 
-                              alt={post.title || 'Post image'} 
-                              className="w-full rounded-md max-h-64 object-cover"
-                            />
+                {posts.map((post) => {
+                  const canDelete = user && (post.authorId === user.uid || (community && community.creatorId === user.uid));
+                  return (
+                    <div
+                      key={post.id}
+                      className="bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
+                    >
+                      <Link
+                        href={`/community/post/${post.id}`}
+                        className="block"
+                      >
+                        <div className="flex gap-3 p-3">
+                          {/* Voting */}
+                          <div className="flex flex-col items-center gap-1 pt-1">
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                // Handle upvote
+                              }}
+                              className="text-gray-400 hover:text-green-600 transition-colors text-lg leading-none"
+                            >
+                              ▲
+                            </button>
+                            <span className="font-bold text-gray-900 text-xs">{post.upvotes - post.downvotes}</span>
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                // Handle downvote
+                              }}
+                              className="text-gray-400 hover:text-red-600 transition-colors text-lg leading-none"
+                            >
+                              ▼
+                            </button>
                           </div>
-                        )}
-                        <div className="flex items-center gap-3 text-xs text-gray-500">
-                          <span className="flex items-center gap-1 hover:text-green-600 transition-colors cursor-pointer">
-                            <MessageSquare className="w-3 h-3" />
-                            {post.commentCount} comments
-                          </span>
-                          <span className="flex items-center gap-1 hover:text-green-600 transition-colors cursor-pointer">
-                            Share
-                          </span>
-                          <span className="flex items-center gap-1 hover:text-green-600 transition-colors cursor-pointer">
-                            Save
-                          </span>
+
+                          {/* Content */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              {post.isTip && (
+                                <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
+                                  💡 Tip
+                                </span>
+                              )}
+                              <Link
+                                href={`/community/user/${post.authorId}`}
+                                className="text-xs text-gray-500 hover:text-green-600 transition-colors font-medium"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                u/{post.authorName}
+                              </Link>
+                              <span className="text-xs text-gray-400">•</span>
+                              <span className="text-xs text-gray-500">{formatDate(post.createdAt)}</span>
+                            </div>
+                            <h3 className="text-base font-semibold text-gray-900 mb-2 line-clamp-2 hover:text-green-600 transition-colors">
+                              {post.title}
+                            </h3>
+                            {viewOption === 'card' && post.imageUrl && (
+                              <div className="mb-2">
+                                <img 
+                                  src={post.imageUrl} 
+                                  alt={post.title || 'Post image'} 
+                                  className="w-full rounded-md max-h-64 object-cover"
+                                />
+                              </div>
+                            )}
+                            <div className="flex items-center gap-3 text-xs text-gray-500">
+                              <span className="flex items-center gap-1 hover:text-green-600 transition-colors cursor-pointer">
+                                <MessageSquare className="w-3 h-3" />
+                                {post.commentCount} comments
+                              </span>
+                              <span className="flex items-center gap-1 hover:text-green-600 transition-colors cursor-pointer">
+                                Share
+                              </span>
+                              <span className="flex items-center gap-1 hover:text-green-600 transition-colors cursor-pointer">
+                                Save
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                      </div>
+                      </Link>
+                      {/* Delete button for post author or community creator */}
+                      {canDelete && (
+                        <div className="px-3 pb-3 flex justify-end">
+                          <button
+                            onClick={(e) => handleDeletePost(post.id!, e)}
+                            disabled={deletingPostId === post.id}
+                            className="flex items-center gap-2 text-red-600 hover:text-red-700 text-xs font-medium disabled:opacity-50"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            {deletingPostId === post.id ? 'Deleting...' : 'Delete Post'}
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  </Link>
-                ))}
+                  );
+                })}
               </div>
             )}
           </main>

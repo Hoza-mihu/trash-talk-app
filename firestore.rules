@@ -23,8 +23,11 @@ service cloud.firestore {
                       (request.resource.data.diff(resource.data).affectedKeys()
                        .hasOnly(['upvotes', 'downvotes', 'commentCount', 'updatedAt']) ||
                        resource.data.authorId == request.auth.uid);
+      // Allow deletion by post author OR community creator
       allow delete: if request.auth != null && 
-                      resource.data.authorId == request.auth.uid;
+                      (resource.data.authorId == request.auth.uid ||
+                       (resource.data.communityId != null && 
+                        get(/databases/$(database)/documents/communities/$(resource.data.communityId)).data.creatorId == request.auth.uid));
     }
     
     // Comments
