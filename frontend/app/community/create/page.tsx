@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, startTransition, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Leaf, Image as ImageIcon } from 'lucide-react';
@@ -23,6 +23,7 @@ function CreatePostForm() {
   const [submitting, setSubmitting] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const isSubmittingRef = useRef(false);
 
   useEffect(() => {
     if (!user) {
@@ -50,63 +51,81 @@ function CreatePostForm() {
   };
 
   const handleShareStats = async () => {
-    if (!user) return;
+    if (!user || submitting || isSubmittingRef.current) return;
     
+    isSubmittingRef.current = true;
     setSubmitting(true);
-    try {
-      const stats = await getUserStats(user.uid);
-      if (stats) {
-        await shareRecyclingStats(
-          user.uid,
-          user.displayName || 'Anonymous',
-          user.photoURL,
-          stats
-        );
-        router.push('/community');
+    
+    // Defer async work to next tick to prevent blocking UI
+    queueMicrotask(async () => {
+      try {
+        const stats = await getUserStats(user.uid);
+        if (stats) {
+          await shareRecyclingStats(
+            user.uid,
+            user.displayName || 'Anonymous',
+            user.photoURL,
+            stats
+          );
+          
+          // Use startTransition for non-urgent navigation
+          startTransition(() => {
+            router.push('/community');
+          });
+        }
+      } catch (error) {
+        console.error('Error sharing stats:', error);
+        alert('Failed to share stats. Please try again.');
+        setSubmitting(false);
+        isSubmittingRef.current = false;
       }
-    } catch (error) {
-      console.error('Error sharing stats:', error);
-      alert('Failed to share stats. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !title.trim() || !content.trim()) return;
+    if (!user || !title.trim() || !content.trim() || submitting || isSubmittingRef.current) return;
 
+    // Prevent double submission
+    isSubmittingRef.current = true;
     setSubmitting(true);
-    try {
-      let imageUrl: string | undefined = undefined;
-      
-      // Upload image to Firebase Storage if provided
-      if (imageFile) {
-        const { uploadPostImage } = await import('@/lib/community');
-        imageUrl = await uploadPostImage(imageFile, user.uid);
-      }
-
-      await createPost(
-        user.uid,
-        user.displayName || 'Anonymous',
-        user.photoURL,
-        {
-          title: title.trim(),
-          content: content.trim(),
-          category,
-          isTip,
-          imageUrl,
-          tags: isTip ? ['tip', category.toLowerCase()] : [category.toLowerCase()]
+    
+    // Defer async work to next tick to prevent blocking UI
+    queueMicrotask(async () => {
+      try {
+        let imageUrl: string | undefined = undefined;
+        
+        // Upload image to Firebase Storage if provided
+        if (imageFile) {
+          const { uploadPostImage } = await import('@/lib/community');
+          imageUrl = await uploadPostImage(imageFile, user.uid);
         }
-      );
 
-      router.push('/community');
-    } catch (error) {
-      console.error('Error creating post:', error);
-      alert('Failed to create post. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
+        await createPost(
+          user.uid,
+          user.displayName || 'Anonymous',
+          user.photoURL,
+          {
+            title: title.trim(),
+            content: content.trim(),
+            category,
+            isTip,
+            imageUrl,
+            tags: isTip ? ['tip', category.toLowerCase()] : [category.toLowerCase()]
+          }
+        );
+
+        // Use startTransition for non-urgent navigation
+        startTransition(() => {
+          router.push('/community');
+        });
+      } catch (error) {
+        console.error('Error creating post:', error);
+        alert('Failed to create post. Please try again.');
+        setSubmitting(false);
+        isSubmittingRef.current = false;
+      }
+    });
   };
 
   if (!user) {
