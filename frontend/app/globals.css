@@ -48,8 +48,16 @@ body {
 input[type="email"],
 input[type="password"],
 input[type="text"],
-input[type="tel"] {
+input[type="tel"],
+textarea,
+select {
   color: #111827 !important;
+}
+
+/* Force select option text to be black */
+select option {
+  color: #111827 !important;
+  background-color: #ffffff !important;
 }
 
 /* Handle autocomplete styling */

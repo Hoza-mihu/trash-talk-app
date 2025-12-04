@@ -158,62 +158,70 @@ export default function CommunityPage() {
 
         {/* Controls */}
         <div className="bg-white rounded-xl p-6 shadow-sm mb-6">
-          <div className="flex flex-wrap gap-4 items-center justify-between">
-            <div className="flex gap-4 items-center">
-              <button
-                onClick={() => {
-                  setSortBy('recent');
-                  setSearchTerm('');
-                  loadPosts();
-                }}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  sortBy === 'recent'
-                    ? 'bg-green-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                Recent
-              </button>
-              <button
-                onClick={() => {
-                  setSortBy('popular');
-                  setSearchTerm('');
-                  loadPosts();
-                }}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  sortBy === 'popular'
-                    ? 'bg-green-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                <TrendingUp className="w-4 h-4 inline mr-2" />
-                Popular
-              </button>
+          <div className="space-y-4">
+            {/* First Row: Sort Options */}
+            <div className="flex items-center gap-4">
+              <span className="text-sm font-medium text-gray-700">Sort by:</span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setSortBy('recent');
+                    setSearchTerm('');
+                    loadPosts();
+                  }}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    sortBy === 'recent'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Recent
+                </button>
+                <button
+                  onClick={() => {
+                    setSortBy('popular');
+                    setSearchTerm('');
+                    loadPosts();
+                  }}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+                    sortBy === 'popular'
+                      ? 'bg-green-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  <TrendingUp className="w-4 h-4" />
+                  Popular
+                </button>
+              </div>
             </div>
 
-            <div className="flex gap-2 items-center">
-              <Filter className="w-5 h-5 text-gray-500" />
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value as WasteCategoryKey | 'all')}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                <option value="all">All Categories</option>
-                {CATEGORY_KEYS.map(category => (
-                  <option key={category} value={category}>{category}</option>
-                ))}
-              </select>
-            </div>
+            {/* Second Row: Filter and Create Post */}
+            <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+              <div className="flex gap-2 items-center">
+                <Filter className="w-5 h-5 text-gray-500" />
+                <span className="text-sm font-medium text-gray-700">Filter:</span>
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value as WasteCategoryKey | 'all')}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 !text-black bg-white min-w-[180px]"
+                >
+                  <option value="all" className="!text-black">All Categories</option>
+                  {CATEGORY_KEYS.map(category => (
+                    <option key={category} value={category} className="!text-black">{category}</option>
+                  ))}
+                </select>
+              </div>
 
-            {user && (
-              <Link
-                href="/community/create"
-                className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 transition-colors"
-              >
-                <Plus className="w-5 h-5" />
-                Create Post
-              </Link>
-            )}
+              {user && (
+                <Link
+                  href="/community/create"
+                  className="flex items-center gap-2 bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-colors"
+                >
+                  <Plus className="w-5 h-5" />
+                  Create Post
+                </Link>
+              )}
+            </div>
           </div>
         </div>
 
