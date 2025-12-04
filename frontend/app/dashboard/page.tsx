@@ -548,28 +548,28 @@ export default function DashboardPage() {
             {/* Join Community */}
             <Link
               href="/community"
-              className="group bg-white rounded-xl p-6 shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-2 border-transparent hover:border-green-500"
+              className="group bg-gradient-to-br from-green-600 to-teal-600 rounded-xl p-6 shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 text-white"
             >
               <div className="flex flex-col items-center text-center">
-                <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mb-4 group-hover:bg-green-200 transition-colors">
-                  <Globe className="w-7 h-7 text-green-600" />
+                <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
+                  <Globe className="w-7 h-7 text-white" />
                 </div>
-                <h4 className="text-lg font-bold text-gray-900 mb-2">Join the Community</h4>
-                <p className="text-sm text-gray-600">Connect with eco-warriors and share tips</p>
+                <h4 className="text-lg font-bold mb-2">Join the Community</h4>
+                <p className="text-sm text-green-100">Connect with eco-warriors and share tips</p>
               </div>
             </Link>
 
             {/* Share Stats */}
             <Link
               href="/community/create?isTip=false"
-              className="group bg-white rounded-xl p-6 shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-2 border-transparent hover:border-green-500"
+              className="group bg-gradient-to-br from-green-600 to-teal-600 rounded-xl p-6 shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 text-white"
             >
               <div className="flex flex-col items-center text-center">
-                <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center mb-4 group-hover:bg-blue-200 transition-colors">
-                  <BarChart3 className="w-7 h-7 text-blue-600" />
+                <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
+                  <BarChart3 className="w-7 h-7 text-white" />
                 </div>
-                <h4 className="text-lg font-bold text-gray-900 mb-2">Share Your Stats</h4>
-                <p className="text-sm text-gray-600">Showcase your recycling achievements</p>
+                <h4 className="text-lg font-bold mb-2">Share Your Stats</h4>
+                <p className="text-sm text-green-100">Showcase your recycling achievements</p>
               </div>
             </Link>
 
