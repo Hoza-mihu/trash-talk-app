@@ -1186,6 +1186,36 @@ export async function getPostsByCommunity(
   }
 }
 
+// Subscribe to real-time updates for community posts
+export function subscribeToCommunityPosts(
+  communityId: string,
+  callback: (posts: CommunityPost[]) => void,
+  limitCount: number = 50
+): Unsubscribe {
+  try {
+    const q = query(
+      collection(db, 'community_posts'),
+      where('communityId', '==', communityId),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
+    );
+
+    return onSnapshot(q, (snapshot) => {
+      const posts = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as CommunityPost));
+      callback(posts);
+    }, (error) => {
+      console.error('Error in community posts subscription:', error);
+      callback([]);
+    });
+  } catch (error) {
+    console.error('Error setting up community posts subscription:', error);
+    return () => {}; // Return empty unsubscribe function
+  }
+}
+
 // Share recycling stats as a post
 export async function shareRecyclingStats(
   userId: string,

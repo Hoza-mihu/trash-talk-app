@@ -8,6 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import {
   getCommunityById,
   getPostsByCommunity,
+  subscribeToCommunityPosts,
   joinCommunity,
   leaveCommunity,
   isCommunityMember,
@@ -88,25 +89,125 @@ export default function CommunityPage() {
         setIsMuted(muted.includes(communityId));
         loadNotifications();
         // Subscribe to real-time notifications
-        const unsubscribe = subscribeToNotifications(user.uid, (notifs) => {
+        const unsubscribeNotifications = subscribeToNotifications(user.uid, (notifs) => {
           setNotifications(notifs);
           setUnreadCount(notifs.filter(n => !n.read).length);
         });
-        return () => unsubscribe();
+        
+        // Subscribe to real-time posts updates
+        const unsubscribePosts = subscribeToCommunityPosts(communityId, (fetchedPosts) => {
+          // Sort posts based on selected option
+          let sortedPosts = [...fetchedPosts];
+          switch (sortOption) {
+            case 'hot':
+              sortedPosts.sort((a, b) => {
+                const scoreA = (a.upvotes - a.downvotes) || 0;
+                const scoreB = (b.upvotes - b.downvotes) || 0;
+                return scoreB - scoreA;
+              });
+              break;
+            case 'new':
+              sortedPosts.sort((a, b) => {
+                const getTime = (date: any): number => {
+                  if (!date) return 0;
+                  if (date.toMillis && typeof date.toMillis === 'function') {
+                    return date.toMillis();
+                  }
+                  if (date instanceof Date) {
+                    return date.getTime();
+                  }
+                  try {
+                    return new Date(date).getTime();
+                  } catch {
+                    return 0;
+                  }
+                };
+                const aTime = getTime(a.createdAt);
+                const bTime = getTime(b.createdAt);
+                return bTime - aTime;
+              });
+              break;
+            case 'top':
+              sortedPosts.sort((a, b) => {
+                const scoreA = (a.upvotes - a.downvotes) || 0;
+                const scoreB = (b.upvotes - b.downvotes) || 0;
+                return scoreB - scoreA;
+              });
+              break;
+            case 'best':
+            default:
+              sortedPosts.sort((a, b) => {
+                const scoreA = (a.upvotes - a.downvotes) || 0;
+                const scoreB = (b.upvotes - b.downvotes) || 0;
+                return scoreB - scoreA;
+              });
+              break;
+          }
+          setPosts(sortedPosts);
+          setLoading(false);
+          
+          // Update highlights
+          const latest = [...fetchedPosts]
+            .sort((a, b) => {
+              const getTime = (date: any): number => {
+                if (!date) return 0;
+                if (date.toMillis && typeof date.toMillis === 'function') {
+                  return date.toMillis();
+                }
+                if (date instanceof Date) {
+                  return date.getTime();
+                }
+                try {
+                  return new Date(date).getTime();
+                } catch {
+                  return 0;
+                }
+              };
+              const aTime = getTime(a.createdAt);
+              const bTime = getTime(b.createdAt);
+              return bTime - aTime;
+            })
+            .slice(0, 3);
+          setLatestPosts(latest);
+          
+          const top = [...fetchedPosts]
+            .sort((a, b) => (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes))
+            .slice(0, 3);
+          setTopPosts(top);
+          setHighlights(top);
+        });
+        
+        return () => {
+          unsubscribeNotifications();
+          unsubscribePosts();
+        };
       }
     }
   }, [communityId, sortOption, user]);
 
-  // Reload posts when returning from create post page
+  // Reload posts when page becomes visible (e.g., returning from create post)
   useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && communityId) {
+        loadPosts();
+        loadHighlights();
+      }
+    };
+    
     const handleFocus = () => {
       if (communityId) {
         loadPosts();
         loadHighlights();
       }
     };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, [communityId]);
 
   const loadNotifications = async () => {

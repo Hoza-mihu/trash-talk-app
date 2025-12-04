@@ -177,7 +177,12 @@ function CreatePostForm() {
 
         // Use startTransition for non-urgent navigation
         startTransition(() => {
-          router.push('/community');
+          // Redirect back to the community page if post was created in a community
+          if (selectedCommunity) {
+            router.push(`/community/c/${selectedCommunity}`);
+          } else {
+            router.push('/community');
+          }
         });
       } catch (error: any) {
         console.error('Error creating post:', error);
