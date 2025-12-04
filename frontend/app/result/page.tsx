@@ -131,7 +131,13 @@ export default function ResultPage() {
               <Recycle className="w-6 h-6 text-green-600" />
               Recycling Tip
             </h3>
-            <p className="text-gray-700 text-lg leading-relaxed">{result.tip}</p>
+            <p className="text-gray-700 text-lg leading-relaxed mb-4">{result.tip}</p>
+            <Link
+              href={`/community/${encodeURIComponent(result.item)}?fromResult=true`}
+              className="inline-flex items-center gap-2 text-green-700 hover:text-green-800 font-semibold underline"
+            >
+              💡 View more tips from the community →
+            </Link>
           </div>
         </div>
 

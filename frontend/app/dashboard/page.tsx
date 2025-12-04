@@ -537,6 +537,20 @@ export default function DashboardPage() {
           <p className="text-gray-700 mb-6 text-lg max-w-2xl mx-auto">
             Every item you analyze helps build a more sustainable future. Continue your journey to make an even bigger impact!
           </p>
+          <div className="flex gap-4 justify-center">
+            <Link
+              href="/community"
+              className="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors"
+            >
+              💬 Join the Community
+            </Link>
+            <Link
+              href="/community/create"
+              className="bg-white text-green-600 px-6 py-3 rounded-lg font-semibold border-2 border-green-600 hover:bg-green-50 transition-colors"
+            >
+              📊 Share Your Stats
+            </Link>
+          </div>
           <Link
             href="/upload"
             className="inline-block bg-green-600 text-white px-10 py-4 rounded-lg font-semibold hover:bg-green-700 transition-all hover:scale-105 shadow-lg"
