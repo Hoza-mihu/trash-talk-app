@@ -26,11 +26,15 @@ export default function Home() {
       { threshold: 0.1 }
     );
 
-    Object.values(sectionRefs.current).forEach((ref) => {
+    // Observe refs after they're set
+    const refs = Object.values(sectionRefs.current).filter(Boolean);
+    refs.forEach((ref) => {
       if (ref) observer.observe(ref);
     });
 
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+    };
   }, []);
 
   return (
