@@ -35,8 +35,10 @@ service cloud.firestore {
                       (request.resource.data.diff(resource.data).affectedKeys()
                        .hasOnly(['upvotes', 'downvotes', 'replyCount']) ||
                        resource.data.authorId == request.auth.uid);
+      // Allow deletion by comment author OR post author
       allow delete: if request.auth != null && 
-                      resource.data.authorId == request.auth.uid;
+                      (resource.data.authorId == request.auth.uid ||
+                       resource.data.postAuthorId == request.auth.uid);
     }
     
     // Votes (for tracking user votes)

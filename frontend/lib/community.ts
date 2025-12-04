@@ -68,6 +68,7 @@ export interface CommunityPost {
 export interface Comment {
   id?: string;
   postId: string;
+  postAuthorId?: string | null; // Post author ID for permission checks
   content: string;
   authorId: string;
   authorName: string;
@@ -376,8 +377,14 @@ export async function addComment(
   parentId?: string
 ): Promise<string> {
   try {
+    // Get post to retrieve post author ID
+    const postRef = doc(db, 'community_posts', postId);
+    const postSnap = await getDoc(postRef);
+    const postAuthorId = postSnap.exists() ? (postSnap.data() as CommunityPost).authorId : null;
+
     const commentRef = await addDoc(collection(db, 'comments'), {
       postId,
+      postAuthorId: postAuthorId || null, // Store post author ID for permission checks
       content,
       authorId: userId,
       authorName: userName,
@@ -397,8 +404,7 @@ export async function addComment(
       });
     }
     
-    // Update post comment count
-    const postRef = doc(db, 'community_posts', postId);
+    // Update post comment count (reuse postRef from above)
     await updateDoc(postRef, {
       commentCount: increment(1),
       updatedAt: serverTimestamp()
