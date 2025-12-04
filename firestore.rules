@@ -1,12 +1,6 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper function to check if user is community creator
-    function isCommunityCreator(communityId) {
-      return exists(/databases/$(database)/documents/communities/$(communityId)) &&
-             get(/databases/$(database)/documents/communities/$(communityId)).data.creatorId == request.auth.uid;
-    }
-    
     // Users collection
     match /users/{userId} {
       allow read: if request.auth != null;
@@ -30,9 +24,12 @@ service cloud.firestore {
                        .hasOnly(['upvotes', 'downvotes', 'commentCount', 'updatedAt']) ||
                        resource.data.authorId == request.auth.uid);
       // Allow deletion by post author OR community creator
+      // For community creator, we check if community exists and user is the creator
       allow delete: if request.auth != null && 
                       (resource.data.authorId == request.auth.uid ||
-                       (resource.data.communityId != null && isCommunityCreator(resource.data.communityId)));
+                       (resource.data.communityId != null && 
+                        exists(/databases/$(database)/documents/communities/$(resource.data.communityId)) &&
+                        get(/databases/$(database)/documents/communities/$(resource.data.communityId)).data.creatorId == request.auth.uid));
     }
     
     // Comments
