@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Recycle, BarChart3, Leaf, TrendingDown, Award, Globe, ArrowLeft, Calendar, X } from 'lucide-react';
@@ -74,6 +74,9 @@ export default function DashboardPage() {
   const [showAchievements, setShowAchievements] = useState(false);
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState<string | null>(null);
+  const [hoveredCard, setHoveredCard] = useState<string | null>(null);
+  const [isVisible, setIsVisible] = useState<{ [key: string]: boolean }>({});
+  const sectionRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 
@@ -131,6 +134,28 @@ export default function DashboardPage() {
     fetchStats();
   }, [user]);
 
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setIsVisible((prev) => ({
+              ...prev,
+              [entry.target.id]: true,
+            }));
+          }
+        });
+      },
+      { threshold: 0.1 }
+    );
+
+    Object.values(sectionRefs.current).forEach((ref) => {
+      if (ref) observer.observe(ref);
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
   interface StatCardProps {
     icon: React.ComponentType<{ className?: string }>;
     label: string;
@@ -162,15 +187,27 @@ export default function DashboardPage() {
     const colors = colorClasses[color as keyof typeof colorClasses] || colorClasses.green;
 
     return (
-      <div className="bg-white rounded-xl p-6 shadow-lg border-2 border-gray-100 hover:shadow-xl hover:-translate-y-1 transition-all">
+      <div 
+        className={`group bg-white rounded-xl p-6 shadow-lg border-2 border-gray-100 hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 transform ${
+          isVisible[`stat-${label}`] ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'
+        }`}
+        id={`stat-${label}`}
+        ref={(el) => { sectionRefs.current[`stat-${label}`] = el; }}
+        onMouseEnter={() => setHoveredCard(`stat-${label}`)}
+        onMouseLeave={() => setHoveredCard(null)}
+      >
         <div className="flex items-center gap-3 mb-3">
-          <div className={`w-12 h-12 rounded-lg ${colors.bg} flex items-center justify-center`}>
-            <Icon className={`w-6 h-6 ${colors.text}`} />
+          <div className={`w-12 h-12 rounded-lg ${colors.bg} flex items-center justify-center transition-all duration-500 group-hover:scale-110 group-hover:rotate-12 ${
+            hoveredCard === `stat-${label}` ? 'shadow-lg' : ''
+          }`}>
+            <Icon className={`w-6 h-6 ${colors.text} transition-transform duration-500 ${
+              hoveredCard === `stat-${label}` ? 'scale-110' : ''
+            }`} />
           </div>
-          <span className="text-gray-600 text-sm font-medium">{label}</span>
+          <span className="text-gray-600 text-sm font-medium group-hover:text-gray-900 transition-colors">{label}</span>
         </div>
-        <div className="text-4xl font-bold text-gray-900 mb-1">{value}</div>
-        {subtitle && <p className="text-xs text-gray-500">{subtitle}</p>}
+        <div className="text-4xl font-bold text-gray-900 mb-1 group-hover:text-green-600 transition-colors">{value}</div>
+        {subtitle && <p className="text-xs text-gray-500 group-hover:text-gray-700 transition-colors">{subtitle}</p>}
       </div>
     );
   };
@@ -198,30 +235,45 @@ export default function DashboardPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-teal-50">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-teal-50 relative overflow-hidden">
+      {/* Animated background elements */}
+      <div className="absolute inset-0 bg-gradient-to-r from-green-400/10 via-teal-400/10 to-green-400/10 pointer-events-none">
+        <div className="absolute top-20 left-10 w-32 h-32 bg-green-300/20 rounded-full blur-2xl animate-float-bubble"></div>
+        <div className="absolute top-40 right-20 w-40 h-40 bg-teal-300/20 rounded-full blur-2xl animate-float-bubble" style={{ animationDelay: '2s' }}></div>
+        <div className="absolute bottom-20 left-1/4 w-36 h-36 bg-green-400/20 rounded-full blur-2xl animate-float-bubble" style={{ animationDelay: '4s' }}></div>
+      </div>
+
       {/* Navigation */}
-      <nav className="bg-white shadow-sm sticky top-0 z-50">
+      <nav className="bg-white/80 backdrop-blur-sm shadow-sm sticky top-0 z-50 relative">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <Leaf className="w-8 h-8 text-green-600" />
-            <span className="text-2xl font-bold text-gray-900">Eco-Eco</span>
+          <Link href="/" className="flex items-center gap-2 group">
+            <Leaf className="w-8 h-8 text-green-600 group-hover:rotate-12 transition-transform duration-300" />
+            <span className="text-2xl font-bold text-gray-900 group-hover:text-green-600 transition-colors">Eco-Eco</span>
           </Link>
-          <Link href="/" className="flex items-center gap-2 text-gray-700 hover:text-green-600 transition-colors">
-            <ArrowLeft className="w-5 h-5" />
+          <Link href="/" className="flex items-center gap-2 text-gray-700 hover:text-green-600 transition-colors group">
+            <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
             <span className="font-medium">Back to Home</span>
           </Link>
         </div>
       </nav>
 
       {/* Dashboard Content */}
-      <div className="max-w-7xl mx-auto px-4 py-12">
+      <div className="max-w-7xl mx-auto px-4 py-12 relative">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-5xl font-bold text-gray-900 mb-3 bg-gradient-to-r from-green-600 to-teal-600 bg-clip-text text-transparent">
+        <div 
+          className="mb-8"
+          id="header"
+          ref={(el) => { sectionRefs.current['header'] = el; }}
+        >
+          <h1 className={`text-5xl font-bold text-gray-900 mb-3 bg-gradient-to-r from-green-600 to-teal-600 bg-clip-text text-transparent transition-all duration-700 ${
+            isVisible['header'] ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'
+          }`}>
             Your Impact Dashboard
           </h1>
-          <p className="text-gray-600 text-lg flex items-center gap-2">
-            <Calendar className="w-5 h-5" />
+          <p className={`text-gray-600 text-lg flex items-center gap-2 transition-all duration-700 ${
+            isVisible['header'] ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'
+          }`} style={{ transitionDelay: '0.1s' }}>
+            <Calendar className="w-5 h-5 animate-pulse-light" />
             Track your environmental contribution over time
           </p>
         </div>
@@ -265,7 +317,13 @@ export default function DashboardPage() {
         )}
 
         {/* Data Visualizations */}
-        <div className="bg-white rounded-xl p-8 shadow-lg mb-8">
+        <div 
+          className={`bg-white rounded-xl p-8 shadow-lg mb-8 transition-all duration-700 hover:shadow-2xl border-2 border-transparent hover:border-green-200 transform ${
+            isVisible['visualizations'] ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'
+          }`}
+          id="visualizations"
+          ref={(el) => { sectionRefs.current['visualizations'] = el; }}
+        >
           <p className="text-sm text-gray-500 mb-4">
             Visuals include historical recycling totals plus your scans for a complete view of impact.
           </p>
@@ -367,8 +425,14 @@ export default function DashboardPage() {
         {/* Main Content Grid */}
         <div className="grid md:grid-cols-2 gap-6 mb-8">
           {/* Waste Breakdown */}
-          <div className="bg-white rounded-xl p-8 shadow-lg">
-            <h3 className="text-2xl font-bold mb-6 text-gray-900">Waste Breakdown</h3>
+          <div 
+            className={`bg-white rounded-xl p-8 shadow-lg transition-all duration-700 hover:shadow-2xl border-2 border-transparent hover:border-green-200 transform ${
+              isVisible['waste-breakdown'] ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'
+            }`}
+            id="waste-breakdown"
+            ref={(el) => { sectionRefs.current['waste-breakdown'] = el; }}
+          >
+            <h3 className="text-2xl font-bold mb-6 text-gray-900 group-hover:text-green-600 transition-colors">Waste Breakdown</h3>
             <div className="space-y-5">
               <div>
                 <div className="flex items-center justify-between mb-2">
@@ -441,9 +505,15 @@ export default function DashboardPage() {
           </div>
 
           {/* Achievement Card */}
-          <div className="bg-gradient-to-br from-green-600 to-teal-600 rounded-xl p-8 shadow-lg text-white">
+          <div 
+            className={`bg-gradient-to-br from-green-600 to-teal-600 rounded-xl p-8 shadow-lg text-white transition-all duration-700 hover:shadow-2xl transform hover:scale-105 ${
+              isVisible['achievement'] ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'
+            }`}
+            id="achievement"
+            ref={(el) => { sectionRefs.current['achievement'] = el; }}
+          >
             <div className="flex items-center gap-4 mb-6">
-              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
+              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center hover:scale-110 transition-transform duration-300 cursor-pointer animate-pulse-light">
                 <Award className="w-8 h-8" />
               </div>
               <div>
@@ -500,44 +570,58 @@ export default function DashboardPage() {
         {(() => {
           const impact = calculateEnvironmentalImpact(userData);
           return (
-            <div className="bg-white rounded-xl p-8 shadow-lg mb-8">
-              <h3 className="text-2xl font-bold mb-6 text-gray-900">Your Environmental Impact</h3>
+            <div 
+              className={`bg-white rounded-xl p-8 shadow-lg mb-8 transition-all duration-700 hover:shadow-2xl border-2 border-transparent hover:border-green-200 transform ${
+                isVisible['environmental-impact'] ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'
+              }`}
+              id="environmental-impact"
+              ref={(el) => { sectionRefs.current['environmental-impact'] = el; }}
+            >
+              <h3 className="text-2xl font-bold mb-6 text-gray-900 group-hover:text-green-600 transition-colors">Your Environmental Impact</h3>
               <div className="grid md:grid-cols-3 gap-6">
-                <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border-2 border-blue-200">
-                  <div className="text-5xl mb-3">🌊</div>
-                  <p className="text-3xl font-bold text-blue-900 mb-2">
-                    {impact.waterSaved.toFixed(0)} L
-                  </p>
-                  <p className="text-sm text-gray-600 font-medium">Water saved through recycling</p>
-                </div>
-                <div className="text-center p-6 bg-gradient-to-br from-green-50 to-green-100 rounded-xl border-2 border-green-200">
-                  <div className="text-5xl mb-3">🌳</div>
-                  <p className="text-3xl font-bold text-green-900 mb-2">
-                    {impact.treesEquivalent > 0 
-                      ? impact.treesEquivalent.toFixed(2) 
-                      : '—'}
-                  </p>
-                  <p className="text-sm text-gray-600 font-medium">Equivalent trees planted</p>
-                </div>
-                <div className="text-center p-6 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border-2 border-purple-200">
-                  <div className="text-5xl mb-3">⚡</div>
-                  <p className="text-3xl font-bold text-purple-900 mb-2">
-                    {impact.energyConserved.toFixed(0)} kWh
-                  </p>
-                  <p className="text-sm text-gray-600 font-medium">Energy conserved</p>
-                </div>
+                {[
+                  { emoji: '🌊', value: `${impact.waterSaved.toFixed(0)} L`, label: 'Water saved through recycling', bg: 'from-blue-50 to-blue-100', border: 'border-blue-200', text: 'text-blue-900', id: 'water' },
+                  { emoji: '🌳', value: impact.treesEquivalent > 0 ? impact.treesEquivalent.toFixed(2) : '—', label: 'Equivalent trees planted', bg: 'from-green-50 to-green-100', border: 'border-green-200', text: 'text-green-900', id: 'trees' },
+                  { emoji: '⚡', value: `${impact.energyConserved.toFixed(0)} kWh`, label: 'Energy conserved', bg: 'from-purple-50 to-purple-100', border: 'border-purple-200', text: 'text-purple-900', id: 'energy' }
+                ].map((item, index) => (
+                  <div 
+                    key={item.id}
+                    className={`text-center p-6 bg-gradient-to-br ${item.bg} rounded-xl border-2 ${item.border} transition-all duration-500 hover:scale-110 hover:shadow-xl transform group cursor-pointer`}
+                    style={{ transitionDelay: `${index * 100}ms` }}
+                    onMouseEnter={() => setHoveredCard(`impact-${item.id}`)}
+                    onMouseLeave={() => setHoveredCard(null)}
+                  >
+                    <div className={`text-5xl mb-3 transition-all duration-500 ${
+                      hoveredCard === `impact-${item.id}` ? 'scale-125 rotate-12' : ''
+                    }`}>{item.emoji}</div>
+                    <p className={`text-3xl font-bold ${item.text} mb-2 transition-all duration-500 ${
+                      hoveredCard === `impact-${item.id}` ? 'scale-110' : ''
+                    }`}>
+                      {item.value}
+                    </p>
+                    <p className="text-sm text-gray-600 font-medium group-hover:text-gray-800 transition-colors">{item.label}</p>
+                  </div>
+                ))}
               </div>
             </div>
           );
         })()}
 
         {/* Call to Action */}
-        <div className="bg-gradient-to-br from-green-50 via-teal-50 to-green-50 rounded-2xl p-8 md:p-12 shadow-lg border-2 border-green-200">
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-green-500 to-teal-500 rounded-full mb-4 shadow-lg">
+        <div 
+          className={`bg-gradient-to-br from-green-50 via-teal-50 to-green-50 rounded-2xl p-8 md:p-12 shadow-lg border-2 border-green-200 transition-all duration-700 hover:shadow-2xl relative overflow-hidden transform ${
+            isVisible['cta'] ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-20 opacity-0 scale-95'
+          }`}
+          id="cta"
+          ref={(el) => { sectionRefs.current['cta'] = el; }}
+        >
+          <div className="absolute top-0 right-0 w-64 h-64 bg-green-300/20 rounded-full -mr-32 -mt-32 animate-pulse"></div>
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-teal-300/20 rounded-full -ml-24 -mb-24 animate-pulse" style={{ animationDelay: '1s' }}></div>
+          <div className="text-center mb-8 relative z-10">
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-green-500 to-teal-500 rounded-full mb-4 shadow-lg hover:scale-110 transition-transform duration-300 cursor-pointer animate-pulse-light">
               <Award className="w-10 h-10 text-white" />
             </div>
-            <h3 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">Keep Up the Great Work!</h3>
+            <h3 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3 bg-gradient-to-r from-green-600 to-teal-600 bg-clip-text text-transparent">Keep Up the Great Work!</h3>
             <p className="text-gray-700 text-lg max-w-2xl mx-auto leading-relaxed">
               Every item you analyze helps build a more sustainable future. Continue your journey to make an even bigger impact!
             </p>
