@@ -81,8 +81,13 @@ export async function createPost(
       throw new Error('Category is required');
     }
 
+    // Remove undefined values - Firestore doesn't accept undefined
+    const cleanPostData = Object.fromEntries(
+      Object.entries(postData).filter(([_, value]) => value !== undefined)
+    );
+
     const postPayload = {
-      ...postData,
+      ...cleanPostData,
       authorId: userId,
       authorName: userName,
       authorPhotoUrl: userPhotoUrl || null,
