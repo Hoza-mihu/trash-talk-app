@@ -339,9 +339,7 @@ export default function PostDetailPage() {
                 <span className="text-sm text-gray-500">Posted {formatDate(post.createdAt)}</span>
               </div>
               
-              {post.title && (
-                <h1 className="text-3xl font-bold text-gray-900 mb-4">{post.title}</h1>
-              )}
+              <h1 className="text-3xl font-bold text-gray-900 mb-4">{post.title}</h1>
               
               {post.imageUrl && (
                 <img src={post.imageUrl} alt={post.title || 'Post image'} className="w-full rounded-lg mb-4 max-h-[600px] object-contain" />

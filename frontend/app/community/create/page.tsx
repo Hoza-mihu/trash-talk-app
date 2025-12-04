@@ -116,9 +116,9 @@ function CreatePostForm() {
     e.preventDefault();
     if (!user || submitting || isSubmittingRef.current) return;
     
-    // At least one of: title, content, or image must be provided
-    if (!title.trim() && !content.trim() && !imageFile) {
-      alert('Please provide at least a title, content, or image.');
+    // Title is required
+    if (!title.trim()) {
+      alert('Please provide a title for your post.');
       return;
     }
 
@@ -152,7 +152,7 @@ function CreatePostForm() {
         }
 
         const postData = {
-          title: title.trim() || undefined,
+          title: title.trim(), // Required - validated above
           content: content.trim() || undefined,
           category,
           communityId: selectedCommunity || undefined,
@@ -281,14 +281,15 @@ function CreatePostForm() {
             {/* Title */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Title (Optional)
+                Title *
               </label>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Enter post title (optional)..."
+                placeholder="Enter post title..."
                 className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 !text-black placeholder:text-gray-400"
+                required
                 maxLength={200}
               />
             </div>

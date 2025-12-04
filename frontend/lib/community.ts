@@ -41,8 +41,8 @@ export interface Community {
 
 export interface CommunityPost {
   id?: string;
-  title?: string; // Optional - can post with just image
-  content?: string; // Optional - can post with just image and title
+  title: string; // Required - must have a title
+  content?: string; // Optional - can post with just title and/or image
   category: WasteCategoryKey;
   communityId?: string; // Optional: which community this post belongs to
   authorId: string;
@@ -92,9 +92,9 @@ export async function createPost(
       throw new Error('User ID and name are required');
     }
     
-    // At least one of: title, content, or imageUrl must be provided
-    if (!postData.title && !postData.content && !postData.imageUrl) {
-      throw new Error('Please provide at least a title, content, or image');
+    // Title is required
+    if (!postData.title || !postData.title.trim()) {
+      throw new Error('Title is required');
     }
 
     if (!postData.category) {

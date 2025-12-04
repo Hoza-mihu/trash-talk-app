@@ -333,9 +333,7 @@ export default function CommunityPage() {
                           )}
                           <span className="text-xs text-gray-500">{formatDate(post.createdAt)}</span>
                         </div>
-                        {post.title && (
-                          <h3 className="text-lg font-bold text-gray-900 mb-1 line-clamp-2">{post.title}</h3>
-                        )}
+                        <h3 className="text-lg font-bold text-gray-900 mb-1 line-clamp-2">{post.title}</h3>
                         {post.imageUrl && (
                           <div className="mb-3">
                             <img 

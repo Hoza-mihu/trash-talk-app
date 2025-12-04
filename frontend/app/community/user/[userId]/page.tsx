@@ -211,9 +211,7 @@ export default function UserProfilePage() {
                               <span className="text-sm text-gray-500">•</span>
                               <span className="text-sm text-gray-500">{formatDate(post.createdAt)}</span>
                             </div>
-                            {post.title && (
-                              <h3 className="text-lg font-bold text-gray-900 mb-2">{post.title}</h3>
-                            )}
+                            <h3 className="text-lg font-bold text-gray-900 mb-2">{post.title}</h3>
                             {post.imageUrl && (
                               <div className="mb-3">
                                 <img 
