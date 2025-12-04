@@ -49,15 +49,32 @@ input[type="email"],
 input[type="password"],
 input[type="text"],
 input[type="tel"],
+input[type="search"],
+input[type="url"],
 textarea,
 select {
   color: #111827 !important;
+}
+
+/* Force input value text to be black (for typed text) */
+input[type="text"]:not(:placeholder-shown),
+input[type="email"]:not(:placeholder-shown),
+input[type="password"]:not(:placeholder-shown),
+textarea:not(:placeholder-shown) {
+  color: #111827 !important;
+  -webkit-text-fill-color: #111827 !important;
 }
 
 /* Force select option text to be black */
 select option {
   color: #111827 !important;
   background-color: #ffffff !important;
+}
+
+/* Force select text when value is selected */
+select {
+  color: #111827 !important;
+  -webkit-text-fill-color: #111827 !important;
 }
 
 /* Handle autocomplete styling */

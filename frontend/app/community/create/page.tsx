@@ -104,10 +104,14 @@ function CreatePostForm() {
         if (imageFile) {
           try {
             const { uploadPostImage } = await import('@/lib/community');
+            console.log('Uploading image:', imageFile.name, imageFile.size, 'bytes');
             imageUrl = await uploadPostImage(imageFile, user.uid);
+            console.log('Image uploaded successfully:', imageUrl);
           } catch (uploadError: any) {
             console.error('Image upload error:', uploadError);
-            throw new Error(`Image upload failed: ${uploadError.message || 'Unknown error'}`);
+            // Don't fail the entire post if image upload fails - continue without image
+            console.warn('Continuing post creation without image due to upload error');
+            // imageUrl remains undefined, post will be created without image
           }
         }
 
