@@ -93,35 +93,61 @@ function CreatePostForm() {
     // Defer async work to next tick to prevent blocking UI
     queueMicrotask(async () => {
       try {
+        // Validate user authentication
+        if (!user || !user.uid) {
+          throw new Error('User not authenticated. Please sign in again.');
+        }
+
         let imageUrl: string | undefined = undefined;
         
         // Upload image to Firebase Storage if provided
         if (imageFile) {
-          const { uploadPostImage } = await import('@/lib/community');
-          imageUrl = await uploadPostImage(imageFile, user.uid);
+          try {
+            const { uploadPostImage } = await import('@/lib/community');
+            imageUrl = await uploadPostImage(imageFile, user.uid);
+          } catch (uploadError: any) {
+            console.error('Image upload error:', uploadError);
+            throw new Error(`Image upload failed: ${uploadError.message || 'Unknown error'}`);
+          }
         }
+
+        const postData = {
+          title: title.trim(),
+          content: content.trim(),
+          category,
+          isTip,
+          imageUrl,
+          tags: isTip ? ['tip', category.toLowerCase()] : [category.toLowerCase()]
+        };
+
+        console.log('Creating post with data:', { ...postData, authorId: user.uid });
 
         await createPost(
           user.uid,
           user.displayName || 'Anonymous',
           user.photoURL,
-          {
-            title: title.trim(),
-            content: content.trim(),
-            category,
-            isTip,
-            imageUrl,
-            tags: isTip ? ['tip', category.toLowerCase()] : [category.toLowerCase()]
-          }
+          postData
         );
 
         // Use startTransition for non-urgent navigation
         startTransition(() => {
           router.push('/community');
         });
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error creating post:', error);
-        alert('Failed to create post. Please try again.');
+        
+        // Provide more specific error messages
+        let errorMessage = 'Failed to create post. Please try again.';
+        
+        if (error?.code === 'permission-denied') {
+          errorMessage = 'Permission denied. Please check your authentication and try again.';
+        } else if (error?.code === 'unavailable') {
+          errorMessage = 'Service temporarily unavailable. Please check your internet connection and try again.';
+        } else if (error?.message) {
+          errorMessage = `Error: ${error.message}`;
+        }
+        
+        alert(errorMessage);
         setSubmitting(false);
         isSubmittingRef.current = false;
       }

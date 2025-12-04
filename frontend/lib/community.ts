@@ -68,7 +68,20 @@ export async function createPost(
   postData: Omit<CommunityPost, 'id' | 'authorId' | 'authorName' | 'authorPhotoUrl' | 'upvotes' | 'downvotes' | 'commentCount' | 'createdAt' | 'updatedAt'>
 ): Promise<string> {
   try {
-    const docRef = await addDoc(collection(db, 'community_posts'), {
+    // Validate required fields
+    if (!userId || !userName) {
+      throw new Error('User ID and name are required');
+    }
+    
+    if (!postData.title || !postData.content) {
+      throw new Error('Title and content are required');
+    }
+
+    if (!postData.category) {
+      throw new Error('Category is required');
+    }
+
+    const postPayload = {
       ...postData,
       authorId: userId,
       authorName: userName,
@@ -78,10 +91,32 @@ export async function createPost(
       commentCount: 0,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
+    };
+
+    console.log('Attempting to create post in Firestore:', {
+      collection: 'community_posts',
+      data: { ...postPayload, createdAt: '[serverTimestamp]', updatedAt: '[serverTimestamp]' }
     });
+
+    const docRef = await addDoc(collection(db, 'community_posts'), postPayload);
+    
+    console.log('Post created successfully with ID:', docRef.id);
     return docRef.id;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating post:', error);
+    console.error('Error details:', {
+      code: error?.code,
+      message: error?.message,
+      stack: error?.stack
+    });
+    
+    // Re-throw with more context
+    if (error?.code) {
+      const enhancedError = new Error(`Firestore error (${error.code}): ${error.message}`);
+      (enhancedError as any).code = error.code;
+      throw enhancedError;
+    }
+    
     throw error;
   }
 }
