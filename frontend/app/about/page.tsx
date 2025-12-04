@@ -76,7 +76,7 @@ export default function AboutPage() {
         {/* Vision Card */}
         <div 
           id="vision"
-          ref={(el) => (sectionRefs.current['vision'] = el)}
+          ref={(el) => { sectionRefs.current['vision'] = el; }}
           className={`group bg-white rounded-2xl p-8 md:p-10 shadow-lg hover:shadow-2xl transition-all duration-500 mb-8 border-2 border-transparent hover:border-green-200 transform ${
             isVisible['vision'] ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'
           }`}
@@ -113,7 +113,7 @@ export default function AboutPage() {
         {/* Mission Card */}
         <div 
           id="mission"
-          ref={(el) => (sectionRefs.current['mission'] = el)}
+          ref={(el) => { sectionRefs.current['mission'] = el; }}
           className={`group bg-white rounded-2xl p-8 md:p-10 shadow-lg hover:shadow-2xl transition-all duration-500 mb-8 border-2 border-transparent hover:border-green-200 transform ${
             isVisible['mission'] ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'
           }`}
@@ -169,7 +169,7 @@ export default function AboutPage() {
         {/* What We Do Card */}
         <div 
           id="whatwedo"
-          ref={(el) => (sectionRefs.current['whatwedo'] = el)}
+          ref={(el) => { sectionRefs.current['whatwedo'] = el; }}
           className={`group bg-white rounded-2xl p-8 md:p-10 shadow-lg hover:shadow-2xl transition-all duration-500 mb-8 border-2 border-transparent hover:border-green-200 transform ${
             isVisible['whatwedo'] ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'
           }`}
@@ -208,7 +208,7 @@ export default function AboutPage() {
         {/* Founder Card - Enhanced */}
         <div 
           id="founder"
-          ref={(el) => (sectionRefs.current['founder'] = el)}
+          ref={(el) => { sectionRefs.current['founder'] = el; }}
           className={`mt-12 bg-gradient-to-br from-green-600 to-teal-600 rounded-2xl p-8 md:p-12 shadow-2xl text-white relative overflow-hidden transform transition-all duration-700 ${
             isVisible['founder'] ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-20 opacity-0 scale-95'
           }`}
