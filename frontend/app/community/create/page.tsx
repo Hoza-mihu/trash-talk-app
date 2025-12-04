@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Leaf, Image as ImageIcon } from 'lucide-react';
@@ -9,7 +9,7 @@ import { createPost, shareRecyclingStats } from '@/lib/community';
 import { CATEGORY_KEYS, CATEGORY_COLORS, WasteCategoryKey } from '@/lib/stats';
 import { getUserStats } from '@/lib/utils';
 
-export default function CreatePostPage() {
+function CreatePostForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
@@ -109,7 +109,8 @@ export default function CreatePostPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-teal-50">
+    <>
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-teal-50">
       {/* Navigation */}
       <nav className="bg-white shadow-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -257,6 +258,22 @@ export default function CreatePostPage() {
         </div>
       </div>
     </div>
+    </>
+  );
+}
+
+export default function CreatePostPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-teal-50">
+        <div className="text-center">
+          <div className="animate-spin w-16 h-16 border-4 border-green-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-lg text-gray-700 font-medium">Loading...</p>
+        </div>
+      </div>
+    }>
+      <CreatePostForm />
+    </Suspense>
   );
 }
 
