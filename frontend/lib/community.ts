@@ -828,7 +828,7 @@ export async function getPopularCommunities(limitCount: number = 20): Promise<Co
 }
 
 // Join a community
-export async function joinCommunity(communityId: string, userId: string): Promise<void> {
+export async function joinCommunity(communityId: string, userId: string, notificationPreference: 'all' | 'popular' | 'off' | 'mute' = 'all'): Promise<void> {
   try {
     const membershipRef = doc(db, 'community_members', `${communityId}_${userId}`);
     const membershipSnap = await getDoc(membershipRef);
@@ -837,7 +837,9 @@ export async function joinCommunity(communityId: string, userId: string): Promis
       await setDoc(membershipRef, {
         communityId,
         userId,
-        joinedAt: serverTimestamp()
+        joinedAt: serverTimestamp(),
+        notificationPreference: notificationPreference,
+        leftAt: null
       });
 
       // Increment member count
@@ -846,9 +848,73 @@ export async function joinCommunity(communityId: string, userId: string): Promis
         memberCount: increment(1),
         updatedAt: serverTimestamp()
       });
+    } else {
+      // If membership exists but user left, rejoin
+      const membershipData = membershipSnap.data();
+      if (membershipData.leftAt) {
+        await updateDoc(membershipRef, {
+          leftAt: null,
+          notificationPreference: notificationPreference,
+          joinedAt: serverTimestamp()
+        });
+
+        // Increment member count
+        const communityRef = doc(db, 'communities', communityId);
+        await updateDoc(communityRef, {
+          memberCount: increment(1),
+          updatedAt: serverTimestamp()
+        });
+      }
     }
   } catch (error) {
     console.error('Error joining community:', error);
+    throw error;
+  }
+}
+
+// Get community membership with notification preference
+export async function getCommunityMembership(communityId: string, userId: string): Promise<{
+  isMember: boolean;
+  notificationPreference: 'all' | 'popular' | 'off' | 'mute' | null;
+} | null> {
+  try {
+    const membershipRef = doc(db, 'community_members', `${communityId}_${userId}`);
+    const membershipSnap = await getDoc(membershipRef);
+
+    if (!membershipSnap.exists()) {
+      return { isMember: false, notificationPreference: null };
+    }
+
+    const data = membershipSnap.data();
+    return {
+      isMember: !data.leftAt,
+      notificationPreference: data.notificationPreference || 'all'
+    };
+  } catch (error) {
+    console.error('Error getting community membership:', error);
+    return null;
+  }
+}
+
+// Update notification preference for a community
+export async function updateNotificationPreference(
+  communityId: string,
+  userId: string,
+  preference: 'all' | 'popular' | 'off' | 'mute'
+): Promise<void> {
+  try {
+    const membershipRef = doc(db, 'community_members', `${communityId}_${userId}`);
+    const membershipSnap = await getDoc(membershipRef);
+
+    if (!membershipSnap.exists()) {
+      throw new Error('User is not a member of this community');
+    }
+
+    await updateDoc(membershipRef, {
+      notificationPreference: preference
+    });
+  } catch (error) {
+    console.error('Error updating notification preference:', error);
     throw error;
   }
 }
@@ -1165,6 +1231,14 @@ async function notifyCommunityMembers(
     const communitySnap = await getDoc(communityRef);
     const communityName = communitySnap.exists() ? communitySnap.data().name : 'Community';
 
+    // Get post data to check if it's popular (need to check after creation)
+    // For now, we'll send notifications and filter by preference
+    const postRef = doc(db, 'community_posts', postId);
+    const postSnap = await getDoc(postRef);
+    const postData = postSnap.exists() ? postSnap.data() : null;
+    const postScore = postData ? ((postData.upvotes || 0) - (postData.downvotes || 0)) : 0;
+    const isPopular = postScore >= 5; // Consider posts with 5+ net upvotes as popular
+
     // Create notifications for all members (except the post author)
     const notifications: Array<{
       userId: string;
@@ -1179,20 +1253,31 @@ async function notifyCommunityMembers(
     membersSnapshot.docs.forEach((memberDoc) => {
       const memberData = memberDoc.data();
       const memberId = memberData.userId;
+      const notificationPreference = memberData.notificationPreference || 'all';
       
       // Don't notify the post author
-      if (memberId !== authorId) {
-        notifications.push({
-          userId: memberId,
-          type: 'new_post' as const,
-          communityId,
-          postId,
-          title: `New post in r/${communityName}`,
-          message: `${authorName} posted: ${postTitle}`,
-          read: false,
-          createdAt: serverTimestamp()
-        });
+      if (memberId === authorId) return;
+      
+      // Check notification preferences
+      if (notificationPreference === 'mute' || notificationPreference === 'off') {
+        return; // Don't send notification
       }
+      
+      if (notificationPreference === 'popular' && !isPopular) {
+        return; // Only send if post is popular (we'll check this later, but for now send all)
+      }
+      
+      // Send notification for 'all' or 'popular' (if post becomes popular later)
+      notifications.push({
+        userId: memberId,
+        type: 'new_post' as const,
+        communityId,
+        postId,
+        title: `New post in r/${communityName}`,
+        message: `${authorName} posted: ${postTitle}`,
+        read: false,
+        createdAt: serverTimestamp()
+      });
     });
 
     // Batch create notifications (Firestore allows up to 500 operations per batch)

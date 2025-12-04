@@ -11,6 +11,8 @@ import {
   joinCommunity,
   leaveCommunity,
   isCommunityMember,
+  getCommunityMembership,
+  updateNotificationPreference,
   deleteCommunity,
   updateCommunityImages,
   uploadCommunityBanner,
@@ -56,6 +58,8 @@ export default function CommunityPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showNotificationSettings, setShowNotificationSettings] = useState(false);
+  const [notificationPreference, setNotificationPreference] = useState<'all' | 'popular' | 'off' | 'mute'>('all');
 
   useEffect(() => {
     if (communityId) {
@@ -221,8 +225,16 @@ export default function CommunityPage() {
   const checkMembership = async () => {
     if (!user) return;
     try {
-      const member = await isCommunityMember(communityId, user.uid);
-      setIsMember(member);
+      const membership = await getCommunityMembership(communityId, user.uid);
+      if (membership) {
+        setIsMember(membership.isMember);
+        if (membership.notificationPreference) {
+          setNotificationPreference(membership.notificationPreference);
+        }
+      } else {
+        const member = await isCommunityMember(communityId, user.uid);
+        setIsMember(member);
+      }
     } catch (error) {
       console.error('Error checking membership:', error);
     }
@@ -239,12 +251,14 @@ export default function CommunityPage() {
       if (isMember) {
         await leaveCommunity(communityId, user.uid);
         setIsMember(false);
+        setNotificationPreference('all'); // Reset preference when leaving
         if (community) {
           setCommunity({ ...community, memberCount: Math.max(0, community.memberCount - 1) });
         }
       } else {
-        await joinCommunity(communityId, user.uid);
-        setIsMember(true);
+        await joinCommunity(communityId, user.uid, notificationPreference);
+        // Reload membership to ensure state is correct
+        await checkMembership();
         if (community) {
           setCommunity({ ...community, memberCount: community.memberCount + 1 });
         }
@@ -254,6 +268,35 @@ export default function CommunityPage() {
       alert('Failed to join/leave community. Please try again.');
     } finally {
       setJoining(false);
+    }
+  };
+
+  const handleNotificationPreferenceChange = async (preference: 'all' | 'popular' | 'off' | 'mute') => {
+    if (!user || !isMember) return;
+    
+    try {
+      await updateNotificationPreference(communityId, user.uid, preference);
+      setNotificationPreference(preference);
+      setShowNotifications(false);
+      
+      // If muting, also add to muted communities list
+      if (preference === 'mute') {
+        const muted = JSON.parse(localStorage.getItem('mutedCommunities') || '[]');
+        if (!muted.includes(communityId)) {
+          muted.push(communityId);
+          localStorage.setItem('mutedCommunities', JSON.stringify(muted));
+          setIsMuted(true);
+        }
+      } else {
+        // Remove from muted list if unmuting
+        const muted = JSON.parse(localStorage.getItem('mutedCommunities') || '[]');
+        const updated = muted.filter((id: string) => id !== communityId);
+        localStorage.setItem('mutedCommunities', JSON.stringify(updated));
+        setIsMuted(false);
+      }
+    } catch (error) {
+      console.error('Error updating notification preference:', error);
+      alert('Failed to update notification preference. Please try again.');
     }
   };
 
@@ -471,7 +514,10 @@ export default function CommunityPage() {
                         {isMember && user && (
                           <div className="relative">
                             <button
-                              onClick={() => setShowNotifications(!showNotifications)}
+                              onClick={() => {
+                                setShowNotificationSettings(!showNotificationSettings);
+                                setShowNotifications(false);
+                              }}
                               className="p-2 rounded-lg hover:bg-gray-100 transition-colors relative"
                             >
                               <Bell className="w-5 h-5 text-gray-600" />
@@ -481,58 +527,66 @@ export default function CommunityPage() {
                                 </span>
                               )}
                             </button>
-                            {showNotifications && (
+                            {showNotificationSettings && (
                               <>
                                 <div
                                   className="fixed inset-0 z-10"
-                                  onClick={() => setShowNotifications(false)}
+                                  onClick={() => setShowNotificationSettings(false)}
                                 ></div>
-                                <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl z-20 border border-gray-200 max-h-96 overflow-y-auto">
-                                  <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-                                    <h3 className="font-semibold text-gray-900">Notifications</h3>
-                                    {unreadCount > 0 && (
-                                      <button
-                                        onClick={handleMarkAllAsRead}
-                                        className="text-sm text-green-600 hover:text-green-700 font-medium"
-                                      >
-                                        Mark all as read
-                                      </button>
-                                    )}
+                                <div className="absolute right-0 mt-2 w-72 bg-gray-800 rounded-lg shadow-xl z-20 border border-gray-700">
+                                  <div className="p-3 border-b border-gray-700">
+                                    <h3 className="text-sm font-semibold text-white">Community notifications</h3>
                                   </div>
-                                  <div className="divide-y divide-gray-200">
-                                    {notifications.length === 0 ? (
-                                      <div className="p-8 text-center text-gray-500">
-                                        <Bell className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-                                        <p>No notifications yet</p>
+                                  <div className="py-1">
+                                    <button
+                                      onClick={() => handleNotificationPreferenceChange('all')}
+                                      className="w-full px-4 py-3 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-3"
+                                    >
+                                      <Bell className={`w-4 h-4 ${notificationPreference === 'all' ? 'text-green-400' : ''}`} />
+                                      <div className="flex-1">
+                                        <div className="font-medium">All new posts</div>
                                       </div>
-                                    ) : (
-                                      notifications.map((notification) => (
-                                        <button
-                                          key={notification.id}
-                                          onClick={() => handleNotificationClick(notification)}
-                                          className={`w-full text-left p-4 hover:bg-gray-50 transition-colors ${
-                                            !notification.read ? 'bg-green-50' : ''
-                                          }`}
-                                        >
-                                          <div className="flex items-start gap-3">
-                                            <div className={`flex-shrink-0 w-2 h-2 rounded-full mt-2 ${
-                                              !notification.read ? 'bg-green-500' : 'bg-transparent'
-                                            }`}></div>
-                                            <div className="flex-1 min-w-0">
-                                              <p className="font-semibold text-sm text-gray-900 mb-1">
-                                                {notification.title}
-                                              </p>
-                                              <p className="text-xs text-gray-600 line-clamp-2">
-                                                {notification.message}
-                                              </p>
-                                              <p className="text-xs text-gray-400 mt-1">
-                                                {formatDate(notification.createdAt)}
-                                              </p>
-                                            </div>
-                                          </div>
-                                        </button>
-                                      ))
-                                    )}
+                                      {notificationPreference === 'all' && (
+                                        <Check className="w-4 h-4 text-green-400" />
+                                      )}
+                                    </button>
+                                    <button
+                                      onClick={() => handleNotificationPreferenceChange('popular')}
+                                      className="w-full px-4 py-3 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-3"
+                                    >
+                                      <Bell className={`w-4 h-4 ${notificationPreference === 'popular' ? 'text-green-400' : ''}`} />
+                                      <div className="flex-1">
+                                        <div className="font-medium">Popular posts</div>
+                                      </div>
+                                      {notificationPreference === 'popular' && (
+                                        <Check className="w-4 h-4 text-green-400" />
+                                      )}
+                                    </button>
+                                    <button
+                                      onClick={() => handleNotificationPreferenceChange('off')}
+                                      className="w-full px-4 py-3 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-3"
+                                    >
+                                      <Bell className={`w-4 h-4 ${notificationPreference === 'off' ? 'text-green-400' : ''}`} />
+                                      <div className="flex-1">
+                                        <div className="font-medium">Off</div>
+                                      </div>
+                                      {notificationPreference === 'off' && (
+                                        <Check className="w-4 h-4 text-green-400" />
+                                      )}
+                                    </button>
+                                    <button
+                                      onClick={() => handleNotificationPreferenceChange('mute')}
+                                      className="w-full px-4 py-3 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-3"
+                                    >
+                                      <VolumeX className={`w-4 h-4 ${notificationPreference === 'mute' ? 'text-red-400' : ''}`} />
+                                      <div className="flex-1">
+                                        <div className="font-medium">Mute</div>
+                                        <div className="text-xs text-gray-400 mt-0.5">Hide everything from this community</div>
+                                      </div>
+                                      {notificationPreference === 'mute' && (
+                                        <Check className="w-4 h-4 text-red-400" />
+                                      )}
+                                    </button>
                                   </div>
                                 </div>
                               </>
