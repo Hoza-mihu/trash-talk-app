@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Leaf, Image as ImageIcon } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { createPost, shareRecyclingStats } from '@/lib/community';
+import { createPost, shareRecyclingStats, getUserCommunities, Community } from '@/lib/community';
 import { CATEGORY_KEYS, CATEGORY_COLORS, WasteCategoryKey } from '@/lib/stats';
 import { getUserStats } from '@/lib/utils';
 
@@ -20,6 +20,10 @@ function CreatePostForm() {
     (searchParams.get('category') as WasteCategoryKey) || 'Other'
   );
   const [isTip, setIsTip] = useState(searchParams.get('isTip') === 'true');
+  const [selectedCommunity, setSelectedCommunity] = useState<string | null>(
+    searchParams.get('communityId')
+  );
+  const [userCommunities, setUserCommunities] = useState<Community[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -36,7 +40,27 @@ function CreatePostForm() {
     if (urlCategory && CATEGORY_KEYS.includes(urlCategory as WasteCategoryKey)) {
       setCategory(urlCategory as WasteCategoryKey);
     }
+    const urlCommunity = searchParams.get('communityId');
+    if (urlCommunity) {
+      setSelectedCommunity(urlCommunity);
+    }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (user) {
+      loadUserCommunities();
+    }
+  }, [user]);
+
+  const loadUserCommunities = async () => {
+    if (!user) return;
+    try {
+      const communities = await getUserCommunities(user.uid);
+      setUserCommunities(communities);
+    } catch (error) {
+      console.error('Error loading user communities:', error);
+    }
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -119,6 +143,7 @@ function CreatePostForm() {
           title: title.trim(),
           content: content.trim(),
           category,
+          communityId: selectedCommunity || undefined,
           isTip,
           imageUrl,
           tags: isTip ? ['tip', category.toLowerCase()] : [category.toLowerCase()]
@@ -184,6 +209,28 @@ function CreatePostForm() {
 
         <div className="bg-white rounded-xl p-8 shadow-lg">
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Community Selection */}
+            {userCommunities.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Post to Community (Optional)
+                </label>
+                <select
+                  value={selectedCommunity || ''}
+                  onChange={(e) => setSelectedCommunity(e.target.value || null)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 !text-black"
+                >
+                  <option value="">No Community (General Feed)</option>
+                  {userCommunities.map(comm => (
+                    <option key={comm.id} value={comm.id}>r/{comm.name}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  Select a community to post in, or leave blank for the general feed
+                </p>
+              </div>
+            )}
+
             {/* Category Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">

@@ -21,11 +21,29 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from './firebase';
 import { WasteCategoryKey } from './stats';
 
+export interface Community {
+  id?: string;
+  name: string;
+  description: string;
+  slug: string; // URL-friendly name (e.g., "plastic-recyclers")
+  category?: WasteCategoryKey;
+  creatorId: string;
+  creatorName: string;
+  memberCount: number;
+  postCount: number;
+  createdAt: Timestamp | Date;
+  updatedAt: Timestamp | Date;
+  imageUrl?: string;
+  rules?: string[];
+  tags?: string[];
+}
+
 export interface CommunityPost {
   id?: string;
   title: string;
   content: string;
   category: WasteCategoryKey;
+  communityId?: string; // Optional: which community this post belongs to
   authorId: string;
   authorName: string;
   authorPhotoUrl?: string;
@@ -507,6 +525,268 @@ export async function uploadPostImage(file: File, userId: string): Promise<strin
   } catch (error) {
     console.error('Error uploading image:', error);
     throw error;
+  }
+}
+
+// ========== COMMUNITY FUNCTIONS ==========
+
+// Create a new community
+export async function createCommunity(
+  userId: string,
+  userName: string,
+  communityData: {
+    name: string;
+    description: string;
+    category?: WasteCategoryKey;
+    imageUrl?: string;
+    rules?: string[];
+    tags?: string[];
+  }
+): Promise<string> {
+  try {
+    if (!userId || !userName) {
+      throw new Error('User ID and name are required');
+    }
+
+    if (!communityData.name || !communityData.description) {
+      throw new Error('Community name and description are required');
+    }
+
+    // Generate slug from name
+    const slug = communityData.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+    // Check if slug already exists
+    const existingCommunity = await getCommunityBySlug(slug);
+    if (existingCommunity) {
+      throw new Error('A community with this name already exists');
+    }
+
+    const communityPayload = {
+      name: communityData.name,
+      description: communityData.description,
+      slug,
+      category: communityData.category || null,
+      creatorId: userId,
+      creatorName: userName,
+      memberCount: 1, // Creator is first member
+      postCount: 0,
+      imageUrl: communityData.imageUrl || null,
+      rules: communityData.rules || [],
+      tags: communityData.tags || [],
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    };
+
+    const docRef = await addDoc(collection(db, 'communities'), communityPayload);
+
+    // Add creator as member
+    await joinCommunity(docRef.id, userId);
+
+    return docRef.id;
+  } catch (error: any) {
+    console.error('Error creating community:', error);
+    throw new Error(`Failed to create community: ${error.message || 'Unknown error'}`);
+  }
+}
+
+// Get community by slug
+export async function getCommunityBySlug(slug: string): Promise<Community | null> {
+  try {
+    const q = query(
+      collection(db, 'communities'),
+      where('slug', '==', slug),
+      limit(1)
+    );
+
+    const querySnapshot = await getDocs(q);
+    if (querySnapshot.empty) return null;
+
+    const doc = querySnapshot.docs[0];
+    return {
+      id: doc.id,
+      ...doc.data()
+    } as Community;
+  } catch (error) {
+    console.error('Error fetching community:', error);
+    return null;
+  }
+}
+
+// Get community by ID
+export async function getCommunityById(communityId: string): Promise<Community | null> {
+  try {
+    const docRef = doc(db, 'communities', communityId);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      return {
+        id: docSnap.id,
+        ...docSnap.data()
+      } as Community;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error fetching community:', error);
+    return null;
+  }
+}
+
+// Get all communities
+export async function getAllCommunities(limitCount: number = 50): Promise<Community[]> {
+  try {
+    const q = query(
+      collection(db, 'communities'),
+      orderBy('memberCount', 'desc'),
+      limit(limitCount)
+    );
+
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as Community));
+  } catch (error) {
+    console.error('Error fetching communities:', error);
+    return [];
+  }
+}
+
+// Get popular communities
+export async function getPopularCommunities(limitCount: number = 20): Promise<Community[]> {
+  try {
+    const q = query(
+      collection(db, 'communities'),
+      orderBy('memberCount', 'desc'),
+      limit(limitCount)
+    );
+
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as Community));
+  } catch (error) {
+    console.error('Error fetching popular communities:', error);
+    return [];
+  }
+}
+
+// Join a community
+export async function joinCommunity(communityId: string, userId: string): Promise<void> {
+  try {
+    const membershipRef = doc(db, 'community_members', `${communityId}_${userId}`);
+    const membershipSnap = await getDoc(membershipRef);
+
+    if (!membershipSnap.exists()) {
+      await setDoc(membershipRef, {
+        communityId,
+        userId,
+        joinedAt: serverTimestamp()
+      });
+
+      // Increment member count
+      const communityRef = doc(db, 'communities', communityId);
+      await updateDoc(communityRef, {
+        memberCount: increment(1),
+        updatedAt: serverTimestamp()
+      });
+    }
+  } catch (error) {
+    console.error('Error joining community:', error);
+    throw error;
+  }
+}
+
+// Leave a community
+export async function leaveCommunity(communityId: string, userId: string): Promise<void> {
+  try {
+    const membershipRef = doc(db, 'community_members', `${communityId}_${userId}`);
+    const membershipSnap = await getDoc(membershipRef);
+
+    if (membershipSnap.exists()) {
+      await updateDoc(membershipRef, {
+        leftAt: serverTimestamp()
+      });
+
+      // Decrement member count
+      const communityRef = doc(db, 'communities', communityId);
+      await updateDoc(communityRef, {
+        memberCount: increment(-1),
+        updatedAt: serverTimestamp()
+      });
+    }
+  } catch (error) {
+    console.error('Error leaving community:', error);
+    throw error;
+  }
+}
+
+// Check if user is member of community
+export async function isCommunityMember(communityId: string, userId: string): Promise<boolean> {
+  try {
+    const membershipRef = doc(db, 'community_members', `${communityId}_${userId}`);
+    const membershipSnap = await getDoc(membershipRef);
+    return membershipSnap.exists() && !membershipSnap.data().leftAt;
+  } catch (error) {
+    console.error('Error checking membership:', error);
+    return false;
+  }
+}
+
+// Get user's communities
+export async function getUserCommunities(userId: string): Promise<Community[]> {
+  try {
+    const q = query(
+      collection(db, 'community_members'),
+      where('userId', '==', userId),
+      where('leftAt', '==', null)
+    );
+
+    const querySnapshot = await getDocs(q);
+    const communityIds = querySnapshot.docs
+      .map(doc => doc.data().communityId)
+      .filter(Boolean);
+
+    if (communityIds.length === 0) return [];
+
+    // Fetch community details
+    const communities: Community[] = [];
+    for (const communityId of communityIds) {
+      const community = await getCommunityById(communityId);
+      if (community) communities.push(community);
+    }
+
+    return communities;
+  } catch (error) {
+    console.error('Error fetching user communities:', error);
+    return [];
+  }
+}
+
+// Get posts by community
+export async function getPostsByCommunity(
+  communityId: string,
+  limitCount: number = 50
+): Promise<CommunityPost[]> {
+  try {
+    const q = query(
+      collection(db, 'community_posts'),
+      where('communityId', '==', communityId),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
+    );
+
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as CommunityPost));
+  } catch (error) {
+    console.error('Error fetching community posts:', error);
+    return [];
   }
 }
 

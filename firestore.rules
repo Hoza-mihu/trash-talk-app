@@ -46,6 +46,26 @@ service cloud.firestore {
       allow update: if request.auth != null;
       allow delete: if request.auth != null;
     }
+
+    // Communities
+    match /communities/{communityId} {
+      allow read: if true; // Public read
+      allow create: if request.auth != null;
+      allow update: if request.auth != null &&
+                      (request.resource.data.diff(resource.data).affectedKeys()
+                       .hasOnly(['memberCount', 'postCount', 'updatedAt']) ||
+                       resource.data.creatorId == request.auth.uid);
+      allow delete: if request.auth != null &&
+                      resource.data.creatorId == request.auth.uid;
+    }
+
+    // Community members
+    match /community_members/{membershipId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if request.auth != null;
+    }
   }
 }
 
