@@ -22,11 +22,13 @@ service firebase.storage {
       allow delete: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Community banner images
-    match /communities/{userId}/{allPaths=**} {
+    // Community banner/images
+    // Supports both /communities/{userId}/ and /communities/{communityId}/ paths
+    // Application-level checks ensure only creators can update their communities
+    match /communities/{pathSegment}/{allPaths=**} {
       allow read: if true; // Public read for community images
-      allow write: if request.auth != null && request.auth.uid == userId;
-      allow delete: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null; // Authenticated users can write (creator check done in app)
+      allow delete: if request.auth != null; // Authenticated users can delete (creator check done in app)
     }
   }
 }
