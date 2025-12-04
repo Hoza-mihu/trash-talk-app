@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, Leaf, Image as ImageIcon } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { createPost, shareRecyclingStats, getUserCommunities, Community } from '@/lib/community';
+import { getUserProfile } from '@/lib/profile';
 import { CATEGORY_KEYS, CATEGORY_COLORS, WasteCategoryKey } from '@/lib/stats';
 import { getUserStats } from '@/lib/utils';
 
@@ -83,12 +84,17 @@ function CreatePostForm() {
     // Defer async work to next tick to prevent blocking UI
     queueMicrotask(async () => {
       try {
-        const stats = await getUserStats(user.uid);
+        const [stats, profile] = await Promise.all([
+          getUserStats(user.uid),
+          getUserProfile(user.uid)
+        ]);
         if (stats) {
+          const userName = profile?.name || user.displayName || 'Anonymous';
+          const userPhoto = profile?.photoUrl || user.photoURL;
           await shareRecyclingStats(
             user.uid,
-            user.displayName || 'Anonymous',
-            user.photoURL,
+            userName,
+            userPhoto,
             stats
           );
           
@@ -151,10 +157,15 @@ function CreatePostForm() {
 
         console.log('Creating post with data:', { ...postData, authorId: user.uid });
 
+        // Get user profile for name and photo
+        const profile = await getUserProfile(user.uid);
+        const userName = profile?.name || user.displayName || 'Anonymous';
+        const userPhoto = profile?.photoUrl || user.photoURL;
+
         await createPost(
           user.uid,
-          user.displayName || 'Anonymous',
-          user.photoURL,
+          userName,
+          userPhoto,
           postData
         );
 

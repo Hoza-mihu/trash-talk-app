@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, MessageSquare, ThumbsUp, ThumbsDown, Leaf, Send, Trash2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { getPostById, addComment, getCommentsByPostId, voteOnPost, getUserVote, deletePost, Comment } from '@/lib/community';
+import { getUserProfile } from '@/lib/profile';
 import { CommunityPost } from '@/lib/community';
 import { CATEGORY_COLORS } from '@/lib/stats';
 
@@ -71,11 +72,16 @@ export default function PostDetailPage() {
 
     setSubmitting(true);
     try {
+      // Get user profile for name and photo
+      const profile = await getUserProfile(user.uid);
+      const userName = profile?.name || user.displayName || 'Anonymous';
+      const userPhoto = profile?.photoUrl || user.photoURL;
+
       await addComment(
         postId,
         user.uid,
-        user.displayName || 'Anonymous',
-        user.photoURL,
+        userName,
+        userPhoto,
         commentText,
         replyingTo || undefined
       );
@@ -95,11 +101,16 @@ export default function PostDetailPage() {
 
     setSubmitting(true);
     try {
+      // Get user profile for name and photo
+      const profile = await getUserProfile(user.uid);
+      const userName = profile?.name || user.displayName || 'Anonymous';
+      const userPhoto = profile?.photoUrl || user.photoURL;
+
       await addComment(
         postId,
         user.uid,
-        user.displayName || 'Anonymous',
-        user.photoURL,
+        userName,
+        userPhoto,
         replyText,
         parentId
       );

@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Leaf, MessageSquare, FileText, User, TrendingUp, Award, Calendar } from 'lucide-react';
 import { getPostsByUser, getCommentsByUser, CommunityPost, Comment } from '@/lib/community';
+import { getUserProfile, UserProfile } from '@/lib/profile';
 import { useAuth } from '@/context/AuthContext';
 
 type TabType = 'overview' | 'posts' | 'comments';
@@ -17,6 +18,7 @@ export default function UserProfilePage() {
   
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('overview');
 
@@ -29,12 +31,14 @@ export default function UserProfilePage() {
   const loadUserData = async () => {
     setLoading(true);
     try {
-      const [userPosts, userComments] = await Promise.all([
+      const [userPosts, userComments, profile] = await Promise.all([
         getPostsByUser(userId, 50),
-        getCommentsByUser(userId, 50)
+        getCommentsByUser(userId, 50),
+        getUserProfile(userId)
       ]);
       setPosts(userPosts);
       setComments(userComments);
+      setUserProfile(profile);
     } catch (error) {
       console.error('Error loading user data:', error);
     } finally {
@@ -60,10 +64,9 @@ export default function UserProfilePage() {
                      comments.reduce((sum, comment) => sum + (comment.upvotes - comment.downvotes), 0);
   const totalContributions = posts.length + comments.length;
   
-  // Get user info from first post or comment
-  const userInfo = posts[0] || comments[0];
-  const userName = userInfo?.authorName || 'User';
-  const userPhoto = userInfo?.authorPhotoUrl;
+  // Get user info from profile, fallback to post/comment data, then to defaults
+  const userName = userProfile?.name || posts[0]?.authorName || comments[0]?.authorName || 'User';
+  const userPhoto = userProfile?.photoUrl || posts[0]?.authorPhotoUrl || comments[0]?.authorPhotoUrl;
   
   // Get account creation date (approximate from oldest post/comment)
   const allDates = [

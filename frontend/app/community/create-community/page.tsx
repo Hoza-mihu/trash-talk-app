@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, Leaf, Upload, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { createCommunity, uploadCommunityImage } from '@/lib/community';
+import { getUserProfile } from '@/lib/profile';
 import { CATEGORY_KEYS, WasteCategoryKey } from '@/lib/stats';
 
 export default function CreateCommunityPage() {
@@ -91,9 +92,13 @@ export default function CreateCommunityPage() {
         tags: tags.filter(t => t.trim())
       };
 
+      // Get user profile for name
+      const profile = await getUserProfile(user.uid);
+      const userName = profile?.name || user.displayName || 'Anonymous';
+
       const communityId = await createCommunity(
         user.uid,
-        user.displayName || 'Anonymous',
+        userName,
         communityData
       );
 
