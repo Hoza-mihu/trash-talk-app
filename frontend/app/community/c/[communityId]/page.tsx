@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Leaf, Users, Plus, MessageSquare, TrendingUp, Filter, Trash2, Bell, MoreHorizontal, Clock, Flame, Trophy, LayoutGrid, List } from 'lucide-react';
+import { ArrowLeft, Leaf, Users, Plus, MessageSquare, TrendingUp, Filter, Trash2, Bell, MoreHorizontal, Clock, Flame, Trophy, LayoutGrid, List, Edit2, Image as ImageIcon, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import {
   getCommunityById,
@@ -12,6 +12,9 @@ import {
   leaveCommunity,
   isCommunityMember,
   deleteCommunity,
+  updateCommunityImages,
+  uploadCommunityBanner,
+  uploadCommunityIcon,
   Community,
   CommunityPost
 } from '@/lib/community';
@@ -34,6 +37,12 @@ export default function CommunityPage() {
   const [deleting, setDeleting] = useState(false);
   const [sortOption, setSortOption] = useState<SortOption>('best');
   const [viewOption, setViewOption] = useState<ViewOption>('card');
+  const [editingImages, setEditingImages] = useState(false);
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const [iconFile, setIconFile] = useState<File | null>(null);
+  const [iconPreview, setIconPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (communityId) {
@@ -174,6 +183,68 @@ export default function CommunityPage() {
     return d.toLocaleDateString();
   };
 
+  const handleBannerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setBannerFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setBannerPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleIconChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setIconFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setIconPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleUpdateImages = async () => {
+    if (!user || !community || community.creatorId !== user.uid) return;
+
+    setUploading(true);
+    try {
+      let bannerUrl: string | undefined = undefined;
+      let iconUrl: string | undefined = undefined;
+
+      if (bannerFile) {
+        bannerUrl = await uploadCommunityBanner(bannerFile, user.uid, community.id);
+      }
+
+      if (iconFile) {
+        iconUrl = await uploadCommunityIcon(iconFile, user.uid, community.id);
+      }
+
+      if (bannerUrl || iconUrl) {
+        await updateCommunityImages(community.id!, user.uid, {
+          bannerUrl: bannerUrl || community.bannerUrl,
+          iconUrl: iconUrl || community.iconUrl
+        });
+
+        // Reload community data
+        await loadCommunity();
+        setEditingImages(false);
+        setBannerFile(null);
+        setBannerPreview(null);
+        setIconFile(null);
+        setIconPreview(null);
+      }
+    } catch (error: any) {
+      console.error('Error updating images:', error);
+      alert(error.message || 'Failed to update images. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   if (loading && !community) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-teal-50 flex items-center justify-center">
@@ -216,15 +287,24 @@ export default function CommunityPage() {
 
       <div className="max-w-7xl mx-auto">
         {/* Community Banner */}
-        {community.imageUrl && (
-          <div className="relative h-32 md:h-48 bg-gradient-to-r from-green-400 to-teal-400 overflow-hidden">
+        <div className="relative h-32 md:h-48 bg-gradient-to-r from-green-400 to-teal-400 overflow-hidden">
+          {(community.bannerUrl || community.imageUrl) && (
             <img
-              src={community.imageUrl}
+              src={community.bannerUrl || community.imageUrl}
               alt={community.name}
               className="w-full h-full object-cover"
             />
-          </div>
-        )}
+          )}
+          {user && community.creatorId === user.uid && (
+            <button
+              onClick={() => setEditingImages(true)}
+              className="absolute top-4 right-4 bg-black/50 hover:bg-black/70 text-white px-4 py-2 rounded-full flex items-center gap-2 transition-colors"
+            >
+              <Edit2 className="w-4 h-4" />
+              Edit Banner
+            </button>
+          )}
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 px-4 py-6">
           {/* Main Content */}
@@ -233,40 +313,51 @@ export default function CommunityPage() {
             <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
               <div className="p-4">
                 <div className="flex items-start gap-4">
-                  {community.imageUrl ? (
-                    <img
-                      src={community.imageUrl}
-                      alt={community.name}
-                      className="w-16 h-16 rounded-full object-cover border-4 border-white -mt-8"
-                    />
-                  ) : (
-                    <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white font-bold text-2xl border-4 border-white -mt-8">
-                      {community.name.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                  <div className="flex-1 pt-2">
-                    <h1 className="text-2xl font-bold text-gray-900 mb-1">r/{community.name}</h1>
-                    <p className="text-sm text-gray-600 mb-3">{community.description}</p>
-                    <div className="flex items-center gap-4 text-xs text-gray-500">
-                      <span className="flex items-center gap-1">
-                        <Users className="w-3 h-3" />
-                        {community.memberCount} members
-                      </span>
-                      <span>•</span>
-                      <span>{community.postCount} posts</span>
-                      {community.category && (
-                        <>
-                          <span>•</span>
-                          <span
-                            className="px-2 py-0.5 rounded-full text-xs font-medium text-white"
-                            style={{ backgroundColor: CATEGORY_COLORS[community.category] }}
-                          >
-                            {community.category}
-                          </span>
-                        </>
-                      )}
-                    </div>
+                {(community.iconUrl || community.imageUrl) ? (
+                  <img
+                    src={community.iconUrl || community.imageUrl}
+                    alt={community.name}
+                    className="w-16 h-16 rounded-full object-cover border-4 border-white -mt-8"
+                  />
+                ) : (
+                  <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white font-bold text-2xl border-4 border-white -mt-8">
+                    {community.name.charAt(0).toUpperCase()}
                   </div>
+                )}
+                <div className="flex-1 pt-2">
+                  <div className="flex items-center gap-3 mb-1">
+                    <h1 className="text-2xl font-bold text-gray-900">r/{community.name}</h1>
+                    {user && community.creatorId === user.uid && (
+                      <button
+                        onClick={() => setEditingImages(true)}
+                        className="text-gray-500 hover:text-green-600 transition-colors"
+                        title="Edit Icon"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-600 mb-3">{community.description}</p>
+                  <div className="flex items-center gap-4 text-xs text-gray-500">
+                    <span className="flex items-center gap-1">
+                      <Users className="w-3 h-3" />
+                      {community.memberCount} members
+                    </span>
+                    <span>•</span>
+                    <span>{community.postCount} posts</span>
+                    {community.category && (
+                      <>
+                        <span>•</span>
+                        <span
+                          className="px-2 py-0.5 rounded-full text-xs font-medium text-white"
+                          style={{ backgroundColor: CATEGORY_COLORS[community.category] }}
+                        >
+                          {community.category}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
                   <div className="flex items-center gap-2 pt-2">
                     {user && community.creatorId === user.uid && (
                       <button
@@ -558,6 +649,139 @@ export default function CommunityPage() {
           </aside>
         </div>
       </div>
+
+      {/* Edit Images Modal */}
+      {editingImages && user && community && community.creatorId === user.uid && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-gray-900">Edit Community Images</h2>
+              <button
+                onClick={() => {
+                  setEditingImages(false);
+                  setBannerFile(null);
+                  setBannerPreview(null);
+                  setIconFile(null);
+                  setIconPreview(null);
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Banner */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Banner</label>
+                {bannerPreview ? (
+                  <div className="relative">
+                    <img src={bannerPreview} alt="Banner preview" className="w-full h-48 object-cover rounded-lg" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBannerFile(null);
+                        setBannerPreview(null);
+                      }}
+                      className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    {community.bannerUrl || community.imageUrl ? (
+                      <div className="relative">
+                        <img
+                          src={community.bannerUrl || community.imageUrl}
+                          alt="Current banner"
+                          className="w-full h-48 object-cover rounded-lg"
+                        />
+                      </div>
+                    ) : null}
+                    <label className="mt-4 flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-green-500 transition-colors bg-gray-50">
+                      <ImageIcon className="w-8 h-8 text-gray-400 mb-2" />
+                      <span className="text-sm text-gray-600">Click to change banner</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleBannerChange}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              {/* Icon */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Icon</label>
+                {iconPreview ? (
+                  <div className="relative inline-block">
+                    <img src={iconPreview} alt="Icon preview" className="w-32 h-32 object-cover rounded-full" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIconFile(null);
+                        setIconPreview(null);
+                      }}
+                      className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-4">
+                    {(community.iconUrl || community.imageUrl) ? (
+                      <img
+                        src={community.iconUrl || community.imageUrl}
+                        alt="Current icon"
+                        className="w-32 h-32 object-cover rounded-full"
+                      />
+                    ) : (
+                      <div className="w-32 h-32 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white font-bold text-4xl">
+                        {community.name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <label className="flex flex-col items-center justify-center w-32 h-32 border-2 border-dashed border-gray-300 rounded-full cursor-pointer hover:border-green-500 transition-colors bg-gray-50">
+                      <ImageIcon className="w-8 h-8 text-gray-400 mb-2" />
+                      <span className="text-sm text-gray-600">Change</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleIconChange}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setEditingImages(false);
+                  setBannerFile(null);
+                  setBannerPreview(null);
+                  setIconFile(null);
+                  setIconPreview(null);
+                }}
+                className="px-6 py-2 bg-gray-200 text-gray-700 rounded-full font-semibold hover:bg-gray-300 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUpdateImages}
+                disabled={uploading || (!bannerFile && !iconFile)}
+                className="px-6 py-2 bg-green-600 text-white rounded-full font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {uploading ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

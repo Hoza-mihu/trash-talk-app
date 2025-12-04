@@ -27,16 +27,21 @@ export interface Community {
   name: string;
   description: string;
   slug: string; // URL-friendly name (e.g., "plastic-recyclers")
-  category?: WasteCategoryKey;
+  category?: WasteCategoryKey | null;
   creatorId: string;
   creatorName: string;
   memberCount: number;
   postCount: number;
   createdAt: Timestamp | Date;
   updatedAt: Timestamp | Date;
-  imageUrl?: string;
+  imageUrl?: string; // Legacy - use bannerUrl and iconUrl instead
+  bannerUrl?: string; // Community banner image
+  iconUrl?: string; // Community icon/avatar
   rules?: string[];
   tags?: string[];
+  communityType?: 'public' | 'restricted' | 'private';
+  matureContent?: boolean;
+  topics?: string[]; // Selected topics (up to 3)
 }
 
 export interface CommunityPost {
@@ -532,7 +537,7 @@ export async function uploadPostImage(file: File, userId: string): Promise<strin
   }
 }
 
-// Upload community image to Firebase Storage
+// Upload community image to Firebase Storage (legacy - use uploadCommunityBanner or uploadCommunityIcon)
 export async function uploadCommunityImage(file: File, userId: string): Promise<string> {
   try {
     const timestamp = Date.now();
@@ -551,6 +556,46 @@ export async function uploadCommunityImage(file: File, userId: string): Promise<
   }
 }
 
+// Upload community banner image
+export async function uploadCommunityBanner(file: File, userId: string, communityId?: string): Promise<string> {
+  try {
+    const timestamp = Date.now();
+    const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const fileName = communityId 
+      ? `communities/${communityId}/banner_${timestamp}_${sanitizedName}`
+      : `communities/${userId}/banner_${timestamp}_${sanitizedName}`;
+    const storageRef = ref(storage, fileName);
+    
+    await uploadBytes(storageRef, file);
+    const downloadURL = await getDownloadURL(storageRef);
+    
+    return downloadURL;
+  } catch (error) {
+    console.error('Error uploading community banner:', error);
+    throw error;
+  }
+}
+
+// Upload community icon
+export async function uploadCommunityIcon(file: File, userId: string, communityId?: string): Promise<string> {
+  try {
+    const timestamp = Date.now();
+    const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const fileName = communityId
+      ? `communities/${communityId}/icon_${timestamp}_${sanitizedName}`
+      : `communities/${userId}/icon_${timestamp}_${sanitizedName}`;
+    const storageRef = ref(storage, fileName);
+    
+    await uploadBytes(storageRef, file);
+    const downloadURL = await getDownloadURL(storageRef);
+    
+    return downloadURL;
+  } catch (error) {
+    console.error('Error uploading community icon:', error);
+    throw error;
+  }
+}
+
 // ========== COMMUNITY FUNCTIONS ==========
 
 // Create a new community
@@ -560,10 +605,15 @@ export async function createCommunity(
   communityData: {
     name: string;
     description: string;
-    category?: WasteCategoryKey;
-    imageUrl?: string;
+    category?: WasteCategoryKey | null;
+    imageUrl?: string; // Legacy
+    bannerUrl?: string;
+    iconUrl?: string;
     rules?: string[];
     tags?: string[];
+    communityType?: 'public' | 'restricted' | 'private';
+    matureContent?: boolean;
+    topics?: string[];
   }
 ): Promise<string> {
   try {
@@ -596,9 +646,14 @@ export async function createCommunity(
       creatorName: userName,
       memberCount: 1, // Creator is first member
       postCount: 0,
-      imageUrl: communityData.imageUrl || null,
+      imageUrl: communityData.imageUrl || communityData.iconUrl || null, // Legacy support
+      bannerUrl: communityData.bannerUrl || null,
+      iconUrl: communityData.iconUrl || null,
       rules: communityData.rules || [],
       tags: communityData.tags || [],
+      communityType: communityData.communityType || 'public',
+      matureContent: communityData.matureContent || false,
+      topics: communityData.topics || [],
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     };
@@ -612,6 +667,49 @@ export async function createCommunity(
   } catch (error: any) {
     console.error('Error creating community:', error);
     throw new Error(`Failed to create community: ${error.message || 'Unknown error'}`);
+  }
+}
+
+// Update community banner and/or icon
+export async function updateCommunityImages(
+  communityId: string,
+  userId: string,
+  updates: {
+    bannerUrl?: string;
+    iconUrl?: string;
+  }
+): Promise<void> {
+  try {
+    const communityRef = doc(db, 'communities', communityId);
+    const communitySnap = await getDoc(communityRef);
+
+    if (!communitySnap.exists()) {
+      throw new Error('Community not found');
+    }
+
+    const communityData = communitySnap.data() as Community;
+    if (communityData.creatorId !== userId) {
+      throw new Error('Only the creator can update community images');
+    }
+
+    const updateData: any = {
+      updatedAt: serverTimestamp()
+    };
+
+    if (updates.bannerUrl !== undefined) {
+      updateData.bannerUrl = updates.bannerUrl;
+    }
+
+    if (updates.iconUrl !== undefined) {
+      updateData.iconUrl = updates.iconUrl;
+      // Also update legacy imageUrl for backward compatibility
+      updateData.imageUrl = updates.iconUrl;
+    }
+
+    await updateDoc(communityRef, updateData);
+  } catch (error: any) {
+    console.error('Error updating community images:', error);
+    throw error;
   }
 }
 
