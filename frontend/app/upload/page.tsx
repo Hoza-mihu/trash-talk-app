@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Upload, Leaf, ArrowLeft } from 'lucide-react';
+import { Upload, Leaf, ArrowLeft, AlertCircle, X } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
@@ -13,6 +13,7 @@ export default function UploadPage() {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
 
@@ -24,24 +25,56 @@ export default function UploadPage() {
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      setFile(selectedFile);
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setUploadedImage(e.target?.result as string);
-      };
-      reader.readAsDataURL(selectedFile);
+    if (!selectedFile) return;
+
+    // Clear previous errors
+    setError(null);
+
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(selectedFile.type)) {
+      setError('Invalid file type. Please upload a PNG, JPG, or WebP image.');
+      return;
     }
+
+    // Validate file size (10MB = 10 * 1024 * 1024 bytes)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (selectedFile.size > maxSize) {
+      setError('File size too large. Please upload an image smaller than 10MB.');
+      return;
+    }
+
+    // Validate minimum file size (at least 1KB)
+    if (selectedFile.size < 1024) {
+      setError('File size too small. Please upload a valid image file.');
+      return;
+    }
+
+    setFile(selectedFile);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setUploadedImage(e.target?.result as string);
+    };
+    reader.onerror = () => {
+      setError('Failed to read the image file. Please try again.');
+    };
+    reader.readAsDataURL(selectedFile);
   };
 
   const analyzeImage = async () => {
-    if (!file) return;
+    if (!file) {
+      setError('Please select an image first.');
+      return;
+    }
     if (!user) {
       router.push('/auth');
       return;
     }
     
+    // Clear previous errors
+    setError(null);
     setAnalyzing(true);
+    
     const formData = new FormData();
     formData.append('image', file);
 
@@ -52,17 +85,29 @@ export default function UploadPage() {
 
       try {
         response = await axios.post('/api/analyze', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
+          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: 30000 // 30 second timeout
         });
-      } catch (proxyError) {
+      } catch (proxyError: any) {
         console.warn('Proxy analyze route failed, falling back to backend URL', proxyError);
         response = await axios.post(`${backendUrl}/api/analyze`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
+          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: 30000
         });
+      }
+      
+      // Validate response
+      if (!response || !response.data) {
+        throw new Error('Invalid response from server. Please try again.');
       }
       
       // Handle backend response format
       const result = response.data.data || response.data;
+      
+      // Validate result structure
+      if (!result.item || !result.category) {
+        throw new Error('Analysis completed but received incomplete results. Please try again.');
+      }
       
       // Store result and redirect
       localStorage.setItem('analysisResult', JSON.stringify(result));
@@ -91,20 +136,41 @@ export default function UploadPage() {
       router.push('/result');
     } catch (error: any) {
       console.error('Analysis failed:', error);
-      alert(`Analysis failed: ${error.response?.data?.message || error.message || 'Unknown error'}. Using demo mode.`);
       
-      // Demo fallback
-      const demoResult = {
-        item: 'Plastic Bottle',
-        category: 'Recyclable',
-        confidence: 94.5,
-        tip: 'Rinse and remove labels before recycling',
-        co2: 0.5
-      };
+      // Determine user-friendly error message
+      let errorMessage = 'Analysis failed. Please try again.';
       
-      localStorage.setItem('analysisResult', JSON.stringify(demoResult));
-      localStorage.setItem('analyzedImage', uploadedImage!);
-      router.push('/result');
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        errorMessage = 'Request timed out. The image may be too large or the server is busy. Please try again with a smaller image.';
+      } else if (error.response) {
+        // Server responded with error status
+        const status = error.response.status;
+        const message = error.response.data?.message || error.response.data?.error;
+        
+        if (status === 400) {
+          errorMessage = message || 'Invalid image format or file. Please ensure your image is a valid PNG or JPG file.';
+        } else if (status === 405) {
+          errorMessage = 'The analysis service is currently unavailable. Please try again later.';
+        } else if (status === 413) {
+          errorMessage = 'Image file is too large. Please upload an image smaller than 10MB.';
+        } else if (status === 415) {
+          errorMessage = 'Unsupported file type. Please upload a PNG or JPG image.';
+        } else if (status === 500) {
+          errorMessage = 'Server error occurred. Please try again later.';
+        } else if (status === 503) {
+          errorMessage = 'Analysis service is temporarily unavailable. Please try again in a few moments.';
+        } else if (message) {
+          errorMessage = message;
+        } else {
+          errorMessage = `Analysis failed with error code ${status}. Please try again.`;
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      } else if (error.request) {
+        errorMessage = 'Unable to connect to the analysis service. Please check your internet connection and try again.';
+      }
+      
+      setError(errorMessage);
     } finally {
       setAnalyzing(false);
     }
@@ -150,6 +216,25 @@ export default function UploadPage() {
           ) : (
             <div>
               <img src={uploadedImage} alt="Uploaded waste" className="w-full rounded-lg mb-6 max-h-96 object-contain" />
+              
+              {/* Error Message */}
+              {error && (
+                <div className="mb-6 bg-red-50 border-2 border-red-200 rounded-lg p-4 flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-red-800 font-semibold mb-1">Error</p>
+                    <p className="text-red-700 text-sm">{error}</p>
+                  </div>
+                  <button
+                    onClick={() => setError(null)}
+                    className="text-red-600 hover:text-red-800 flex-shrink-0"
+                    aria-label="Dismiss error"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              )}
+
               {analyzing ? (
                 <div className="text-center">
                   <div className="animate-spin w-12 h-12 border-4 border-green-600 border-t-transparent rounded-full mx-auto mb-4"></div>
@@ -160,7 +245,8 @@ export default function UploadPage() {
                 <div className="flex gap-4">
                   <button
                     onClick={analyzeImage}
-                    className="flex-1 bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors"
+                    className="flex-1 bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={!!error}
                   >
                     Analyze Image
                   </button>
@@ -168,6 +254,7 @@ export default function UploadPage() {
                     onClick={() => {
                       setUploadedImage(null);
                       setFile(null);
+                      setError(null);
                     }}
                     className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
                   >
