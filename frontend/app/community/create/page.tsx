@@ -349,7 +349,7 @@ function CreatePostForm() {
             <div className="flex gap-4 pt-4">
               <button
                 type="submit"
-                disabled={submitting || !title.trim() || !content.trim()}
+                disabled={submitting || !title.trim()}
                 className="flex-1 bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {submitting ? 'Posting...' : 'Create Post'}
