@@ -1,8 +1,9 @@
 'use client';
 
+import React from 'react';
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
-import { Camera, Recycle, BarChart3, Leaf, UserCircle, Sparkles, Zap, TrendingUp } from 'lucide-react';
+import { Camera, Recycle, BarChart3, Leaf, UserCircle, Sparkles, Zap } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 export default function Home() {
@@ -15,7 +16,7 @@ export default function Home() {
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (entry.isIntersecting) {
+          if (entry.isIntersecting && entry.target.id) {
             setIsVisible((prev) => ({
               ...prev,
               [entry.target.id]: true,
@@ -26,15 +27,11 @@ export default function Home() {
       { threshold: 0.1 }
     );
 
-    // Observe refs after they're set
-    const refs = Object.values(sectionRefs.current).filter(Boolean);
-    refs.forEach((ref) => {
+    Object.values(sectionRefs.current).forEach((ref) => {
       if (ref) observer.observe(ref);
     });
 
-    return () => {
-      observer.disconnect();
-    };
+    return () => observer.disconnect();
   }, []);
 
   return (
