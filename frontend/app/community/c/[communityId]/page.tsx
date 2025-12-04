@@ -351,7 +351,7 @@ export default function CommunityPage() {
           {user && community.creatorId === user.uid && (
             <button
               onClick={() => setEditingImages(true)}
-              className="absolute top-4 right-4 bg-black/50 hover:bg-black/70 text-white px-4 py-2 rounded-full flex items-center gap-2 transition-colors"
+              className="absolute top-4 right-4 bg-black/50 hover:bg-black/70 text-white px-4 py-2 rounded-full flex items-center gap-2 transition-colors text-sm"
             >
               <Edit2 className="w-4 h-4" />
               Edit Banner
@@ -359,142 +359,147 @@ export default function CommunityPage() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 px-4 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 px-4 py-4">
           {/* Main Content */}
           <main className="lg:col-span-8 space-y-4">
             {/* Community Header */}
             <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
               <div className="p-4">
                 <div className="flex items-start gap-4">
-                {(community.iconUrl || community.imageUrl) ? (
-                  <img
-                    src={community.iconUrl || community.imageUrl}
-                    alt={community.name}
-                    className="w-16 h-16 rounded-full object-cover border-4 border-white -mt-8"
-                  />
-                ) : (
-                  <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white font-bold text-2xl border-4 border-white -mt-8">
-                    {community.name.charAt(0).toUpperCase()}
-                  </div>
-                )}
-                <div className="flex-1 pt-2">
-                  <div className="flex items-center gap-3 mb-1">
-                    <h1 className="text-2xl font-bold text-gray-900">r/{community.name}</h1>
-                    {user && community.creatorId === user.uid && (
-                      <button
-                        onClick={() => setEditingImages(true)}
-                        className="text-gray-500 hover:text-green-600 transition-colors"
-                        title="Edit Icon"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                  <p className="text-sm text-gray-600 mb-3">{community.description}</p>
-                  <div className="flex items-center gap-4 text-xs text-gray-500">
-                    <span className="flex items-center gap-1">
-                      <Users className="w-3 h-3" />
-                      {community.memberCount} members
-                    </span>
-                    <span>•</span>
-                    <span>{community.postCount} posts</span>
-                    {community.category && (
-                      <>
-                        <span>•</span>
-                        <span
-                          className="px-2 py-0.5 rounded-full text-xs font-medium text-white"
-                          style={{ backgroundColor: CATEGORY_COLORS[community.category] }}
+                  {/* Community Icon - Overlapping Banner */}
+                  {(community.iconUrl || community.imageUrl) ? (
+                    <img
+                      src={community.iconUrl || community.imageUrl}
+                      alt={community.name}
+                      className="w-20 h-20 rounded-full object-cover border-4 border-white -mt-10 relative z-10"
+                    />
+                  ) : (
+                    <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white font-bold text-3xl border-4 border-white -mt-10 relative z-10">
+                      {community.name.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  
+                  <div className="flex-1 pt-1">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-3">
+                        <h1 className="text-2xl font-bold text-gray-900">r/{community.name}</h1>
+                        {user && community.creatorId === user.uid && (
+                          <button
+                            onClick={() => setEditingImages(true)}
+                            className="text-gray-400 hover:text-green-600 transition-colors p-1"
+                            title="Edit Icon"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                      
+                      {/* Action Buttons Row */}
+                      <div className="flex items-center gap-2">
+                        {user && community.creatorId === user.uid && (
+                          <button
+                            onClick={handleDeleteCommunity}
+                            disabled={deleting}
+                            className="px-4 py-2 rounded-lg font-semibold transition-colors bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 flex items-center gap-2 text-sm"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            {deleting ? 'Deleting...' : 'Delete'}
+                          </button>
+                        )}
+                        {isMember && user && (
+                          <Link
+                            href={`/community/create?communityId=${communityId}`}
+                            className="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors text-sm flex items-center gap-2"
+                          >
+                            <Plus className="w-4 h-4" />
+                            Create Post
+                          </Link>
+                        )}
+                        {isMember && (
+                          <button className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
+                            <Bell className="w-5 h-5 text-gray-600" />
+                          </button>
+                        )}
+                        <button
+                          onClick={handleJoinLeave}
+                          disabled={joining}
+                          className={`px-6 py-2 rounded-lg font-semibold transition-colors text-sm flex items-center gap-2 ${
+                            isMember
+                              ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                              : 'bg-green-600 text-white hover:bg-green-700'
+                          } disabled:opacity-50`}
                         >
-                          {community.category}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
-                  <div className="flex items-center gap-2 pt-2">
-                    {user && community.creatorId === user.uid && (
-                      <button
-                        onClick={handleDeleteCommunity}
-                        disabled={deleting}
-                        className="px-4 py-2 rounded-full font-semibold transition-colors bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 flex items-center gap-2 text-sm"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        {deleting ? 'Deleting...' : 'Delete'}
-                      </button>
-                    )}
-                    {isMember && user && (
-                      <Link
-                        href={`/community/create?communityId=${communityId}`}
-                        className="px-4 py-2 bg-green-600 text-white rounded-full font-semibold hover:bg-green-700 transition-colors text-sm flex items-center gap-2"
-                      >
-                        <Plus className="w-4 h-4" />
-                        Create Post
-                      </Link>
-                    )}
-                    {isMember && (
-                      <button className="p-2 rounded-full hover:bg-gray-100 transition-colors relative">
-                        <Bell className="w-5 h-5 text-gray-600" />
-                      </button>
-                    )}
-                    <button
-                      onClick={handleJoinLeave}
-                      disabled={joining}
-                      className={`px-6 py-2 rounded-full font-semibold transition-colors text-sm flex items-center gap-2 ${
-                        isMember
-                          ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                          : 'bg-green-600 text-white hover:bg-green-700'
-                      } disabled:opacity-50`}
-                    >
-                      {joining ? '...' : isMember ? (
+                          {joining ? '...' : isMember ? (
+                            <>
+                              <Check className="w-4 h-4" />
+                              Joined
+                            </>
+                          ) : 'Join'}
+                        </button>
+                        <div className="relative">
+                          <button
+                            onClick={() => setShowDropdown(!showDropdown)}
+                            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                          >
+                            <MoreHorizontal className="w-5 h-5 text-gray-600" />
+                          </button>
+                          {showDropdown && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-10"
+                                onClick={() => setShowDropdown(false)}
+                              ></div>
+                              <div className="absolute right-0 mt-2 w-56 bg-gray-800 rounded-lg shadow-xl z-20 border border-gray-700">
+                                <div className="py-1">
+                                  <button
+                                    onClick={() => {
+                                      alert('Custom feed feature coming soon!');
+                                      setShowDropdown(false);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
+                                  >
+                                    <Bookmark className="w-4 h-4" />
+                                    Add to custom feed
+                                  </button>
+                                  <button
+                                    onClick={handleToggleFavorite}
+                                    className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
+                                  >
+                                    <Star className={`w-4 h-4 ${isFavorite ? 'text-yellow-400 fill-yellow-400' : ''}`} />
+                                    {isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                                  </button>
+                                  <button
+                                    onClick={handleToggleMute}
+                                    className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
+                                  >
+                                    <VolumeX className={`w-4 h-4 ${isMuted ? 'text-red-400' : ''}`} />
+                                    {isMuted ? 'Unmute r/' + community.name : 'Mute r/' + community.name}
+                                  </button>
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <p className="text-sm text-gray-600 mb-2">{community.description}</p>
+                    <div className="flex items-center gap-4 text-xs text-gray-500">
+                      <span className="flex items-center gap-1">
+                        <Users className="w-3 h-3" />
+                        {community.memberCount} members
+                      </span>
+                      <span>•</span>
+                      <span>{community.postCount} posts</span>
+                      {community.category && (
                         <>
-                          <Check className="w-4 h-4" />
-                          Joined
-                        </>
-                      ) : 'Join'}
-                    </button>
-                    <div className="relative">
-                      <button
-                        onClick={() => setShowDropdown(!showDropdown)}
-                        className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-                      >
-                        <MoreHorizontal className="w-5 h-5 text-gray-600" />
-                      </button>
-                      {showDropdown && (
-                        <>
-                          <div
-                            className="fixed inset-0 z-10"
-                            onClick={() => setShowDropdown(false)}
-                          ></div>
-                          <div className="absolute right-0 mt-2 w-56 bg-gray-800 rounded-lg shadow-xl z-20 border border-gray-700">
-                            <div className="py-1">
-                              <button
-                                onClick={handleToggleFavorite}
-                                className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
-                              >
-                                <Star className={`w-4 h-4 ${isFavorite ? 'text-yellow-400 fill-yellow-400' : ''}`} />
-                                {isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-                              </button>
-                              <button
-                                onClick={handleToggleMute}
-                                className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
-                              >
-                                <VolumeX className={`w-4 h-4 ${isMuted ? 'text-red-400' : ''}`} />
-                                {isMuted ? 'Unmute r/' + community.name : 'Mute r/' + community.name}
-                              </button>
-                              <div className="border-t border-gray-700 my-1"></div>
-                              <button
-                                onClick={() => {
-                                  // Add to custom feed functionality (can be implemented later)
-                                  alert('Custom feed feature coming soon!');
-                                  setShowDropdown(false);
-                                }}
-                                className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
-                              >
-                                <Bookmark className="w-4 h-4" />
-                                Add to custom feed
-                              </button>
-                            </div>
-                          </div>
+                          <span>•</span>
+                          <span
+                            className="px-2 py-0.5 rounded-full text-xs font-medium text-white"
+                            style={{ backgroundColor: CATEGORY_COLORS[community.category] }}
+                          >
+                            {community.category}
+                          </span>
                         </>
                       )}
                     </div>
@@ -506,7 +511,7 @@ export default function CommunityPage() {
             {/* Community Highlights */}
             {highlights.length > 0 && (
               <div className="bg-white rounded-lg border border-gray-200 p-4">
-                <div className="flex items-center gap-2 mb-3">
+                <div className="flex items-center gap-2 mb-4">
                   <Rocket className="w-4 h-4 text-gray-500" />
                   <h2 className="text-sm font-semibold text-gray-900">Community highlights</h2>
                 </div>
@@ -515,9 +520,21 @@ export default function CommunityPage() {
                     <Link
                       key={post.id}
                       href={`/community/post/${post.id}`}
-                      className="block p-3 rounded-lg border border-gray-200 hover:border-green-500 hover:bg-green-50 transition-colors"
+                      className="block p-3 rounded-lg border border-gray-200 hover:border-green-500 hover:bg-green-50 transition-all cursor-pointer"
                     >
-                      <div className="flex items-center gap-2 mb-2">
+                      <h3 className="text-sm font-semibold text-gray-900 line-clamp-2 mb-2">
+                        {post.title}
+                      </h3>
+                      {post.imageUrl && (
+                        <div className="mb-2">
+                          <img
+                            src={post.imageUrl}
+                            alt={post.title}
+                            className="w-full h-24 object-cover rounded"
+                          />
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 mt-2">
                         {post.isTip && (
                           <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
                             💡 Tip
@@ -526,17 +543,13 @@ export default function CommunityPage() {
                         <span className="text-xs text-gray-500">
                           {post.upvotes - post.downvotes} upvotes
                         </span>
+                        {post.commentCount > 0 && (
+                          <>
+                            <span className="text-xs text-gray-400">•</span>
+                            <span className="text-xs text-gray-500">{post.commentCount} comments</span>
+                          </>
+                        )}
                       </div>
-                      <h3 className="text-sm font-semibold text-gray-900 line-clamp-2 mb-1">
-                        {post.title}
-                      </h3>
-                      {post.imageUrl && (
-                        <img
-                          src={post.imageUrl}
-                          alt={post.title}
-                          className="w-full h-20 object-cover rounded mt-2"
-                        />
-                      )}
                     </Link>
                   ))}
                 </div>
@@ -722,24 +735,26 @@ export default function CommunityPage() {
           {/* Sidebar */}
           <aside className="lg:col-span-4 space-y-4">
             {/* Community Info */}
-            <div className="bg-white rounded-lg border border-gray-200 p-4 sticky top-20">
-              <div className="flex items-center gap-2 mb-3">
-                {(community.iconUrl || community.imageUrl) ? (
-                  <img
-                    src={community.iconUrl || community.imageUrl}
-                    alt={community.name}
-                    className="w-10 h-10 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white font-bold">
-                    {community.name.charAt(0).toUpperCase()}
-                  </div>
-                )}
-                <h3 className="font-bold text-gray-900 text-base">r/{community.name}</h3>
+            <div className="bg-white rounded-lg border border-gray-200 p-4 sticky top-20 space-y-4">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  {(community.iconUrl || community.imageUrl) ? (
+                    <img
+                      src={community.iconUrl || community.imageUrl}
+                      alt={community.name}
+                      className="w-10 h-10 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white font-bold">
+                      {community.name.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <h3 className="font-bold text-gray-900 text-base">r/{community.name}</h3>
+                </div>
+                <p className="text-gray-700 text-sm">{community.description}</p>
               </div>
-              <p className="text-gray-700 text-sm mb-4">{community.description}</p>
               
-              <div className="space-y-2 text-xs mb-4">
+              <div className="space-y-2 text-xs">
                 <div className="flex items-center justify-between py-1">
                   <span className="text-gray-500">Created</span>
                   <span className="font-medium text-gray-900">
@@ -772,6 +787,48 @@ export default function CommunityPage() {
                   </span>
                 </div>
               </div>
+
+              {/* User Flair Section */}
+              {user && isMember && (
+                <div className="pt-4 border-t border-gray-200">
+                  <h4 className="text-xs font-semibold text-gray-900 mb-2 uppercase">User Flair</h4>
+                  <div className="flex items-center gap-2">
+                    {user.photoURL ? (
+                      <img
+                        src={user.photoURL}
+                        alt={user.displayName || 'User'}
+                        className="w-6 h-6 rounded-full"
+                      />
+                    ) : (
+                      <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                        {user.displayName?.charAt(0) || user.email?.charAt(0) || 'U'}
+                      </div>
+                    )}
+                    <span className="text-sm text-gray-700">{user.displayName || user.email || 'User'}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Community Achievements */}
+              {community.postCount > 0 && (
+                <div className="pt-4 border-t border-gray-200">
+                  <h4 className="text-xs font-semibold text-gray-900 mb-2 uppercase">Community Achievements</h4>
+                  <div className="space-y-2">
+                    {community.postCount >= 10 && (
+                      <div className="flex items-center gap-2 text-xs text-gray-600">
+                        <Trophy className="w-4 h-4 text-yellow-500" />
+                        <span>Active Community</span>
+                      </div>
+                    )}
+                    {community.memberCount >= 10 && (
+                      <div className="flex items-center gap-2 text-xs text-gray-600">
+                        <Users className="w-4 h-4 text-green-500" />
+                        <span>Growing Community</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {community.tags && community.tags.length > 0 && (
                 <div className="pt-4 border-t border-gray-200">
