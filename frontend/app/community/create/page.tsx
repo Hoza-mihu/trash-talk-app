@@ -281,15 +281,14 @@ function CreatePostForm() {
             {/* Title */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Title *
+                Title (Optional)
               </label>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Enter post title..."
+                placeholder="Enter post title (optional)..."
                 className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 !text-black placeholder:text-gray-400"
-                required
                 maxLength={200}
               />
             </div>
@@ -297,7 +296,7 @@ function CreatePostForm() {
             {/* Content */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Content *
+                Content (Optional)
               </label>
               <textarea
                 value={content}
@@ -306,6 +305,9 @@ function CreatePostForm() {
                 className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 !text-black placeholder:text-gray-400"
                 rows={10}
               />
+              <p className="mt-1 text-xs text-gray-500">
+                If you provide content, it will only be visible when users click on the post
+              </p>
             </div>
 
             {/* Image Upload */}
