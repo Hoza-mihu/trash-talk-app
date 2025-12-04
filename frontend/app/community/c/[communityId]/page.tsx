@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Leaf, Users, Plus, MessageSquare, TrendingUp, Filter, Trash2, Bell, MoreHorizontal, Clock, Flame, Trophy, LayoutGrid, List, Edit2, Image as ImageIcon, X } from 'lucide-react';
+import { ArrowLeft, Leaf, Users, Plus, MessageSquare, TrendingUp, Filter, Trash2, Bell, MoreHorizontal, Clock, Flame, Trophy, LayoutGrid, List, Edit2, Image as ImageIcon, X, Star, Bookmark, VolumeX, Rocket, Check } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import {
   getCommunityById,
@@ -43,6 +43,10 @@ export default function CommunityPage() {
   const [iconFile, setIconFile] = useState<File | null>(null);
   const [iconPreview, setIconPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [highlights, setHighlights] = useState<CommunityPost[]>([]);
 
   useEffect(() => {
     if (communityId) {
@@ -56,8 +60,57 @@ export default function CommunityPage() {
   useEffect(() => {
     if (communityId) {
       loadPosts();
+      loadHighlights();
+      // Load favorites and muted status from localStorage
+      if (user) {
+        const favorites = JSON.parse(localStorage.getItem('favoriteCommunities') || '[]');
+        const muted = JSON.parse(localStorage.getItem('mutedCommunities') || '[]');
+        setIsFavorite(favorites.includes(communityId));
+        setIsMuted(muted.includes(communityId));
+      }
     }
-  }, [communityId, sortOption]);
+  }, [communityId, sortOption, user]);
+
+  const loadHighlights = async () => {
+    try {
+      // Get top 3 posts by upvotes from this community
+      const allPosts = await getPostsByCommunity(communityId, 50);
+      const sorted = [...allPosts].sort((a, b) => (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes));
+      setHighlights(sorted.slice(0, 3));
+    } catch (error) {
+      console.error('Error loading highlights:', error);
+    }
+  };
+
+  const handleToggleFavorite = () => {
+    if (!user) return;
+    const favorites = JSON.parse(localStorage.getItem('favoriteCommunities') || '[]');
+    if (isFavorite) {
+      const updated = favorites.filter((id: string) => id !== communityId);
+      localStorage.setItem('favoriteCommunities', JSON.stringify(updated));
+      setIsFavorite(false);
+    } else {
+      favorites.push(communityId);
+      localStorage.setItem('favoriteCommunities', JSON.stringify(favorites));
+      setIsFavorite(true);
+    }
+    setShowDropdown(false);
+  };
+
+  const handleToggleMute = () => {
+    if (!user) return;
+    const muted = JSON.parse(localStorage.getItem('mutedCommunities') || '[]');
+    if (isMuted) {
+      const updated = muted.filter((id: string) => id !== communityId);
+      localStorage.setItem('mutedCommunities', JSON.stringify(updated));
+      setIsMuted(false);
+    } else {
+      muted.push(communityId);
+      localStorage.setItem('mutedCommunities', JSON.stringify(muted));
+      setIsMuted(true);
+    }
+    setShowDropdown(false);
+  };
 
   const loadCommunity = async () => {
     try {
@@ -378,27 +431,117 @@ export default function CommunityPage() {
                         Create Post
                       </Link>
                     )}
-                    <button className="p-2 rounded-full hover:bg-gray-100 transition-colors">
-                      <Bell className="w-5 h-5 text-gray-600" />
-                    </button>
+                    {isMember && (
+                      <button className="p-2 rounded-full hover:bg-gray-100 transition-colors relative">
+                        <Bell className="w-5 h-5 text-gray-600" />
+                      </button>
+                    )}
                     <button
                       onClick={handleJoinLeave}
                       disabled={joining}
-                      className={`px-6 py-2 rounded-full font-semibold transition-colors text-sm ${
+                      className={`px-6 py-2 rounded-full font-semibold transition-colors text-sm flex items-center gap-2 ${
                         isMember
                           ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                           : 'bg-green-600 text-white hover:bg-green-700'
                       } disabled:opacity-50`}
                     >
-                      {joining ? '...' : isMember ? 'Joined' : 'Join'}
+                      {joining ? '...' : isMember ? (
+                        <>
+                          <Check className="w-4 h-4" />
+                          Joined
+                        </>
+                      ) : 'Join'}
                     </button>
-                    <button className="p-2 rounded-full hover:bg-gray-100 transition-colors">
-                      <MoreHorizontal className="w-5 h-5 text-gray-600" />
-                    </button>
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowDropdown(!showDropdown)}
+                        className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                      >
+                        <MoreHorizontal className="w-5 h-5 text-gray-600" />
+                      </button>
+                      {showDropdown && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-10"
+                            onClick={() => setShowDropdown(false)}
+                          ></div>
+                          <div className="absolute right-0 mt-2 w-56 bg-gray-800 rounded-lg shadow-xl z-20 border border-gray-700">
+                            <div className="py-1">
+                              <button
+                                onClick={handleToggleFavorite}
+                                className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
+                              >
+                                <Star className={`w-4 h-4 ${isFavorite ? 'text-yellow-400 fill-yellow-400' : ''}`} />
+                                {isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                              </button>
+                              <button
+                                onClick={handleToggleMute}
+                                className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
+                              >
+                                <VolumeX className={`w-4 h-4 ${isMuted ? 'text-red-400' : ''}`} />
+                                {isMuted ? 'Unmute r/' + community.name : 'Mute r/' + community.name}
+                              </button>
+                              <div className="border-t border-gray-700 my-1"></div>
+                              <button
+                                onClick={() => {
+                                  // Add to custom feed functionality (can be implemented later)
+                                  alert('Custom feed feature coming soon!');
+                                  setShowDropdown(false);
+                                }}
+                                className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
+                              >
+                                <Bookmark className="w-4 h-4" />
+                                Add to custom feed
+                              </button>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
+
+            {/* Community Highlights */}
+            {highlights.length > 0 && (
+              <div className="bg-white rounded-lg border border-gray-200 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Rocket className="w-4 h-4 text-gray-500" />
+                  <h2 className="text-sm font-semibold text-gray-900">Community highlights</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {highlights.map((post) => (
+                    <Link
+                      key={post.id}
+                      href={`/community/post/${post.id}`}
+                      className="block p-3 rounded-lg border border-gray-200 hover:border-green-500 hover:bg-green-50 transition-colors"
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        {post.isTip && (
+                          <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
+                            💡 Tip
+                          </span>
+                        )}
+                        <span className="text-xs text-gray-500">
+                          {post.upvotes - post.downvotes} upvotes
+                        </span>
+                      </div>
+                      <h3 className="text-sm font-semibold text-gray-900 line-clamp-2 mb-1">
+                        {post.title}
+                      </h3>
+                      {post.imageUrl && (
+                        <img
+                          src={post.imageUrl}
+                          alt={post.title}
+                          className="w-full h-20 object-cover rounded mt-2"
+                        />
+                      )}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Sort and View Options */}
             <div className="bg-white rounded-lg border border-gray-200 p-2 flex items-center justify-between">
@@ -580,8 +723,21 @@ export default function CommunityPage() {
           <aside className="lg:col-span-4 space-y-4">
             {/* Community Info */}
             <div className="bg-white rounded-lg border border-gray-200 p-4 sticky top-20">
-              <h3 className="font-bold text-gray-900 mb-3 text-sm">About r/{community.name}</h3>
-              <p className="text-gray-700 text-xs mb-4">{community.description}</p>
+              <div className="flex items-center gap-2 mb-3">
+                {(community.iconUrl || community.imageUrl) ? (
+                  <img
+                    src={community.iconUrl || community.imageUrl}
+                    alt={community.name}
+                    className="w-10 h-10 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white font-bold">
+                    {community.name.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <h3 className="font-bold text-gray-900 text-base">r/{community.name}</h3>
+              </div>
+              <p className="text-gray-700 text-sm mb-4">{community.description}</p>
               
               <div className="space-y-2 text-xs mb-4">
                 <div className="flex items-center justify-between py-1">
@@ -611,7 +767,9 @@ export default function CommunityPage() {
                 )}
                 <div className="flex items-center justify-between py-1">
                   <span className="text-gray-500">Type</span>
-                  <span className="font-medium text-gray-900">Public</span>
+                  <span className="font-medium text-gray-900 capitalize">
+                    {community.communityType || 'Public'}
+                  </span>
                 </div>
               </div>
 
