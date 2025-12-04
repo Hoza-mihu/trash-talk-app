@@ -451,10 +451,10 @@ export default function CommunityPage() {
                         <div className="flex items-center gap-4 text-xs text-gray-500">
                           <Link
                             href={`/community/user/${post.authorId}`}
-                            className="hover:text-green-600 transition-colors"
+                            className="hover:text-green-600 transition-colors font-medium"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            by {post.authorName}
+                            u/{post.authorName}
                           </Link>
                           <span className="flex items-center gap-1">
                             <MessageSquare className="w-3 h-3" />

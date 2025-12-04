@@ -119,7 +119,13 @@ export default function CategoryTipsPage() {
                     <h3 className="text-xl font-bold text-gray-900 mb-2">{tip.title}</h3>
                     <p className="text-gray-700 mb-4 whitespace-pre-line">{tip.content}</p>
                     <div className="flex items-center gap-4 text-sm text-gray-500">
-                      <span>by {tip.authorName}</span>
+                      <Link
+                        href={`/community/user/${tip.authorId}`}
+                        className="hover:text-green-600 transition-colors font-medium"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        u/{tip.authorName}
+                      </Link>
                       <span className="flex items-center gap-1">
                         <MessageSquare className="w-4 h-4" />
                         {tip.commentCount} comments

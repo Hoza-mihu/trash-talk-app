@@ -169,7 +169,12 @@ export default function PostDetailPage() {
           )}
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
-              <span className="font-semibold text-gray-900">{comment.authorName}</span>
+              <Link
+                href={`/community/user/${comment.authorId}`}
+                className="font-semibold text-gray-900 hover:text-green-600 transition-colors"
+              >
+                u/{comment.authorName}
+              </Link>
               <span className="text-sm text-gray-500">{formatDate(comment.createdAt)}</span>
             </div>
             <p className="text-gray-700 whitespace-pre-line mb-3">{comment.content}</p>
@@ -335,7 +340,12 @@ export default function PostDetailPage() {
 
               <div className="flex items-center justify-between border-t pt-4">
                 <div className="flex items-center gap-4 text-sm text-gray-500">
-                  <span>by {post.authorName}</span>
+                  <Link
+                    href={`/community/user/${post.authorId}`}
+                    className="hover:text-green-600 transition-colors font-medium"
+                  >
+                    u/{post.authorName}
+                  </Link>
                   <span className="flex items-center gap-1">
                     <MessageSquare className="w-4 h-4" />
                     {post.commentCount} comments
