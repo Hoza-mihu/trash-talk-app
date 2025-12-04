@@ -1,6 +1,5 @@
 'use client';
 
-import React from 'react';
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import { Camera, Recycle, BarChart3, Leaf, UserCircle, Sparkles, Zap } from 'lucide-react';
@@ -16,7 +15,7 @@ export default function Home() {
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (entry.isIntersecting && entry.target.id) {
+          if (entry.isIntersecting) {
             setIsVisible((prev) => ({
               ...prev,
               [entry.target.id]: true,
@@ -125,7 +124,7 @@ export default function Home() {
             {[
               { icon: Camera, bgColor: 'bg-blue-100', iconColor: 'text-blue-600', hoverBg: 'bg-gradient-to-br from-blue-500 to-blue-600', borderColor: 'hover:border-blue-200', id: 'step1', title: '1. Upload Image', desc: 'Take a photo of your waste item and upload it to our AI-powered system' },
               { icon: Recycle, bgColor: 'bg-green-100', iconColor: 'text-green-600', hoverBg: 'bg-gradient-to-br from-green-500 to-green-600', borderColor: 'hover:border-green-200', id: 'step2', title: '2. Get Insights', desc: 'Receive instant AI classification and personalized recycling tips' },
-              { icon: BarChart3, bgColor: 'bg-purple-100', iconColor: 'text-purple-600', hoverBg: 'bg-gradient-to-br from-purple-500 to-purple-600', borderColor: 'hover:border-purple-200', id: 'step3', title: '3. Track Impact', desc: 'Monitor your contribution and see how much waste you've reduced' }
+              { icon: BarChart3, bgColor: 'bg-purple-100', iconColor: 'text-purple-600', hoverBg: 'bg-gradient-to-br from-purple-500 to-purple-600', borderColor: 'hover:border-purple-200', id: 'step3', title: '3. Track Impact', desc: "Monitor your contribution and see how much waste you've reduced" }
             ].map((step, index) => (
               <div
                 key={step.id}
