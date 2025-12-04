@@ -120,26 +120,24 @@ export default function Home() {
           </h2>
           <div className="grid md:grid-cols-3 gap-8">
             {[
-              { icon: Camera, color: 'blue', title: '1. Upload Image', desc: 'Take a photo of your waste item and upload it to our AI-powered system', id: 'step1' },
-              { icon: Recycle, color: 'green', title: '2. Get Insights', desc: 'Receive instant AI classification and personalized recycling tips', id: 'step2' },
-              { icon: BarChart3, color: 'purple', title: '3. Track Impact', desc: 'Monitor your contribution and see how much waste you've reduced', id: 'step3' }
+              { icon: Camera, bgColor: 'bg-blue-100', iconColor: 'text-blue-600', hoverBg: 'bg-gradient-to-br from-blue-500 to-blue-600', borderColor: 'hover:border-blue-200', id: 'step1', title: '1. Upload Image', desc: 'Take a photo of your waste item and upload it to our AI-powered system' },
+              { icon: Recycle, bgColor: 'bg-green-100', iconColor: 'text-green-600', hoverBg: 'bg-gradient-to-br from-green-500 to-green-600', borderColor: 'hover:border-green-200', id: 'step2', title: '2. Get Insights', desc: 'Receive instant AI classification and personalized recycling tips' },
+              { icon: BarChart3, bgColor: 'bg-purple-100', iconColor: 'text-purple-600', hoverBg: 'bg-gradient-to-br from-purple-500 to-purple-600', borderColor: 'hover:border-purple-200', id: 'step3', title: '3. Track Impact', desc: 'Monitor your contribution and see how much waste you've reduced' }
             ].map((step, index) => (
               <div
                 key={step.id}
                 id={step.id}
                 ref={(el) => { sectionRefs.current[step.id] = el; }}
-                className={`group bg-white rounded-xl p-8 shadow-sm text-center hover:shadow-2xl transition-all duration-500 border-2 border-transparent hover:border-${step.color}-200 transform hover:-translate-y-2 ${
+                className={`group bg-white rounded-xl p-8 shadow-sm text-center hover:shadow-2xl transition-all duration-500 border-2 border-transparent ${step.borderColor} transform hover:-translate-y-2 ${
                   isVisible[step.id] ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'
                 }`}
                 style={{ transitionDelay: `${index * 100}ms` }}
                 onMouseEnter={() => setHoveredCard(step.id)}
                 onMouseLeave={() => setHoveredCard(null)}
               >
-                <div className={`w-20 h-20 bg-${step.color}-100 rounded-full flex items-center justify-center mx-auto mb-4 transition-all duration-500 group-hover:scale-110 group-hover:rotate-12 ${
-                  hoveredCard === step.id ? `bg-gradient-to-br from-${step.color}-500 to-${step.color}-600` : ''
-                }`}>
+                <div className={`w-20 h-20 ${hoveredCard === step.id ? step.hoverBg : step.bgColor} rounded-full flex items-center justify-center mx-auto mb-4 transition-all duration-500 group-hover:scale-110 group-hover:rotate-12`}>
                   <step.icon className={`w-10 h-10 transition-all duration-500 ${
-                    hoveredCard === step.id ? 'text-white scale-110' : `text-${step.color}-600`
+                    hoveredCard === step.id ? 'text-white scale-110' : step.iconColor
                   }`} />
                 </div>
                 <h3 className="text-xl font-bold mb-3 text-gray-900 group-hover:text-green-600 transition-colors">
