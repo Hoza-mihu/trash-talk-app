@@ -532,31 +532,61 @@ export default function DashboardPage() {
         })()}
 
         {/* Call to Action */}
-        <div className="bg-gradient-to-r from-green-100 to-teal-100 rounded-xl p-10 text-center shadow-lg border-2 border-green-200">
-          <h3 className="text-3xl font-bold text-gray-900 mb-4">🎯 Keep Up the Great Work!</h3>
-          <p className="text-gray-700 mb-6 text-lg max-w-2xl mx-auto">
-            Every item you analyze helps build a more sustainable future. Continue your journey to make an even bigger impact!
-          </p>
-          <div className="flex gap-4 justify-center">
+        <div className="bg-gradient-to-br from-green-50 via-teal-50 to-green-50 rounded-2xl p-8 md:p-12 shadow-lg border-2 border-green-200">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-green-500 to-teal-500 rounded-full mb-4 shadow-lg">
+              <Award className="w-10 h-10 text-white" />
+            </div>
+            <h3 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">Keep Up the Great Work!</h3>
+            <p className="text-gray-700 text-lg max-w-2xl mx-auto leading-relaxed">
+              Every item you analyze helps build a more sustainable future. Continue your journey to make an even bigger impact!
+            </p>
+          </div>
+
+          {/* Action Buttons Grid */}
+          <div className="grid md:grid-cols-3 gap-4 max-w-4xl mx-auto">
+            {/* Join Community */}
             <Link
               href="/community"
-              className="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors"
+              className="group bg-white rounded-xl p-6 shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-2 border-transparent hover:border-green-500"
             >
-              💬 Join the Community
+              <div className="flex flex-col items-center text-center">
+                <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mb-4 group-hover:bg-green-200 transition-colors">
+                  <Globe className="w-7 h-7 text-green-600" />
+                </div>
+                <h4 className="text-lg font-bold text-gray-900 mb-2">Join the Community</h4>
+                <p className="text-sm text-gray-600">Connect with eco-warriors and share tips</p>
+              </div>
             </Link>
+
+            {/* Share Stats */}
             <Link
-              href="/community/create"
-              className="bg-white text-green-600 px-6 py-3 rounded-lg font-semibold border-2 border-green-600 hover:bg-green-50 transition-colors"
+              href="/community/create?isTip=false"
+              className="group bg-white rounded-xl p-6 shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-2 border-transparent hover:border-green-500"
             >
-              📊 Share Your Stats
+              <div className="flex flex-col items-center text-center">
+                <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center mb-4 group-hover:bg-blue-200 transition-colors">
+                  <BarChart3 className="w-7 h-7 text-blue-600" />
+                </div>
+                <h4 className="text-lg font-bold text-gray-900 mb-2">Share Your Stats</h4>
+                <p className="text-sm text-gray-600">Showcase your recycling achievements</p>
+              </div>
+            </Link>
+
+            {/* Analyze More */}
+            <Link
+              href="/upload"
+              className="group bg-gradient-to-br from-green-600 to-teal-600 rounded-xl p-6 shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 text-white"
+            >
+              <div className="flex flex-col items-center text-center">
+                <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
+                  <Recycle className="w-7 h-7 text-white" />
+                </div>
+                <h4 className="text-lg font-bold mb-2">Analyze More Items</h4>
+                <p className="text-sm text-green-100">Continue your recycling journey</p>
+              </div>
             </Link>
           </div>
-          <Link
-            href="/upload"
-            className="inline-block bg-green-600 text-white px-10 py-4 rounded-lg font-semibold hover:bg-green-700 transition-all hover:scale-105 shadow-lg"
-          >
-            📸 Analyze More Items
-          </Link>
         </div>
       </div>
 
