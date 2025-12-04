@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Leaf, User, Phone, Mail, Calendar, LogOut } from 'lucide-react';
+import { Leaf, User, Phone, Mail, Calendar, LogOut, MessageSquare, Users, Plus } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import {
   createUserProfile,
@@ -13,6 +13,12 @@ import {
 } from '@/lib/profile';
 import { getUserStats } from '@/lib/utils';
 import { createDefaultUserStats, type UserStats } from '@/lib/stats';
+import {
+  getPostsByUser,
+  getCommunitiesByCreator,
+  type CommunityPost,
+  type Community
+} from '@/lib/community';
 import { storage } from '@/lib/firebase';
 import { ref, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 
@@ -36,6 +42,10 @@ export default function ProfilePage() {
     email: ''
   });
   const [stats, setStats] = useState<UserStats>(createDefaultUserStats());
+  const [userPosts, setUserPosts] = useState<CommunityPost[]>([]);
+  const [userCommunities, setUserCommunities] = useState<Community[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(true);
+  const [loadingCommunities, setLoadingCommunities] = useState(true);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -77,6 +87,44 @@ export default function ProfilePage() {
 
     loadData();
   }, [user]);
+
+  useEffect(() => {
+    const loadUserContent = async () => {
+      if (!user) return;
+      
+      setLoadingPosts(true);
+      setLoadingCommunities(true);
+      
+      try {
+        const [posts, communities] = await Promise.all([
+          getPostsByUser(user.uid, 10),
+          getCommunitiesByCreator(user.uid, 10)
+        ]);
+        setUserPosts(posts);
+        setUserCommunities(communities);
+      } catch (error) {
+        console.error('Error loading user content:', error);
+      } finally {
+        setLoadingPosts(false);
+        setLoadingCommunities(false);
+      }
+    };
+
+    loadUserContent();
+  }, [user]);
+
+  const formatDate = (date: any) => {
+    if (!date) return 'Recently';
+    const d = date.toDate ? date.toDate() : new Date(date);
+    const now = new Date();
+    const diff = now.getTime() - d.getTime();
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    
+    if (days === 0) return 'Today';
+    if (days === 1) return 'Yesterday';
+    if (days < 7) return `${days} days ago`;
+    return d.toLocaleDateString();
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setProfile((prev) => ({
@@ -408,6 +456,141 @@ export default function ProfilePage() {
               </Link>
             </div>
           </div>
+        </section>
+      </div>
+
+      {/* User's Created Content */}
+      <div className="max-w-6xl mx-auto px-4 pb-12 grid lg:grid-cols-2 gap-6">
+        {/* My Posts */}
+        <section className="bg-white rounded-2xl shadow-lg p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <MessageSquare className="w-6 h-6 text-green-600" />
+              My Posts
+            </h2>
+            <Link
+              href="/community/create"
+              className="flex items-center gap-2 text-green-600 hover:text-green-700 font-medium text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Create Post
+            </Link>
+          </div>
+
+          {loadingPosts ? (
+            <div className="text-center py-8">
+              <div className="animate-spin w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full mx-auto mb-2"></div>
+              <p className="text-gray-500 text-sm">Loading posts...</p>
+            </div>
+          ) : userPosts.length === 0 ? (
+            <div className="text-center py-8">
+              <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-600 mb-4">You haven't created any posts yet.</p>
+              <Link
+                href="/community/create"
+                className="inline-block bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 transition-colors text-sm"
+              >
+                Create Your First Post
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {userPosts.map((post) => (
+                <Link
+                  key={post.id}
+                  href={`/community/post/${post.id}`}
+                  className="block p-4 border border-gray-200 rounded-lg hover:border-green-300 hover:shadow-md transition-all"
+                >
+                  <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{post.title}</h3>
+                  <p className="text-sm text-gray-600 mb-3 line-clamp-2">{post.content}</p>
+                  <div className="flex items-center gap-4 text-xs text-gray-500">
+                    <span>{formatDate(post.createdAt)}</span>
+                    <span>•</span>
+                    <span>{post.upvotes - post.downvotes} votes</span>
+                    <span>•</span>
+                    <span>{post.commentCount} comments</span>
+                  </div>
+                </Link>
+              ))}
+              {userPosts.length >= 10 && (
+                <Link
+                  href={`/community/user/${user?.uid}`}
+                  className="block text-center text-green-600 hover:text-green-700 font-medium text-sm py-2"
+                >
+                  View All Posts →
+                </Link>
+              )}
+            </div>
+          )}
+        </section>
+
+        {/* My Communities */}
+        <section className="bg-white rounded-2xl shadow-lg p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <Users className="w-6 h-6 text-green-600" />
+              My Communities
+            </h2>
+            <Link
+              href="/community/create-community"
+              className="flex items-center gap-2 text-green-600 hover:text-green-700 font-medium text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Create Community
+            </Link>
+          </div>
+
+          {loadingCommunities ? (
+            <div className="text-center py-8">
+              <div className="animate-spin w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full mx-auto mb-2"></div>
+              <p className="text-gray-500 text-sm">Loading communities...</p>
+            </div>
+          ) : userCommunities.length === 0 ? (
+            <div className="text-center py-8">
+              <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-600 mb-4">You haven't created any communities yet.</p>
+              <Link
+                href="/community/create-community"
+                className="inline-block bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 transition-colors text-sm"
+              >
+                Create Your First Community
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {userCommunities.map((community) => (
+                <Link
+                  key={community.id}
+                  href={`/community/c/${community.id}`}
+                  className="block p-4 border border-gray-200 rounded-lg hover:border-green-300 hover:shadow-md transition-all"
+                >
+                  <div className="flex items-center gap-3 mb-2">
+                    {community.imageUrl ? (
+                      <img
+                        src={community.imageUrl}
+                        alt={community.name}
+                        className="w-12 h-12 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white font-bold">
+                        {community.name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-gray-900">r/{community.name}</h3>
+                      <p className="text-xs text-gray-500">{community.memberCount} members</p>
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-600 line-clamp-2 mb-2">{community.description}</p>
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <span>{community.postCount} posts</span>
+                    <span>•</span>
+                    <span>Created {formatDate(community.createdAt)}</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
         </section>
       </div>
     </div>

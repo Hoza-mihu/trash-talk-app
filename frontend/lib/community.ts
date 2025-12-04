@@ -736,7 +736,7 @@ export async function isCommunityMember(communityId: string, userId: string): Pr
   }
 }
 
-// Get user's communities
+// Get user's communities (communities they've joined)
 export async function getUserCommunities(userId: string): Promise<Community[]> {
   try {
     const q = query(
@@ -762,6 +762,27 @@ export async function getUserCommunities(userId: string): Promise<Community[]> {
     return communities;
   } catch (error) {
     console.error('Error fetching user communities:', error);
+    return [];
+  }
+}
+
+// Get communities created by a user
+export async function getCommunitiesByCreator(userId: string, limitCount: number = 20): Promise<Community[]> {
+  try {
+    const q = query(
+      collection(db, 'communities'),
+      where('creatorId', '==', userId),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
+    );
+
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as Community));
+  } catch (error) {
+    console.error('Error fetching communities by creator:', error);
     return [];
   }
 }
