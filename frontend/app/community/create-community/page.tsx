@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Leaf, Upload, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { createCommunity, uploadPostImage } from '@/lib/community';
+import { createCommunity, uploadCommunityImage } from '@/lib/community';
 import { CATEGORY_KEYS, WasteCategoryKey } from '@/lib/stats';
 
 export default function CreateCommunityPage() {
@@ -75,7 +75,7 @@ export default function CreateCommunityPage() {
       let imageUrl: string | undefined = undefined;
       if (imageFile) {
         try {
-          imageUrl = await uploadPostImage(imageFile, user.uid);
+          imageUrl = await uploadCommunityImage(imageFile, user.uid);
         } catch (uploadError: any) {
           console.error('Image upload error:', uploadError);
           alert(`Image upload failed: ${uploadError.message || 'Unknown error'}. Community will be created without an image.`);

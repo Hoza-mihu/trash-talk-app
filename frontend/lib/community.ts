@@ -9,6 +9,7 @@ import {
   doc, 
   getDoc, 
   updateDoc, 
+  deleteDoc,
   increment,
   Timestamp,
   serverTimestamp,
@@ -17,7 +18,7 @@ import {
   setDoc,
   getDoc as getFirestoreDoc
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from './firebase';
 import { WasteCategoryKey } from './stats';
 
@@ -515,7 +516,9 @@ export async function getCommentsByUser(userId: string, limitCount: number = 20)
 export async function uploadPostImage(file: File, userId: string): Promise<string> {
   try {
     const timestamp = Date.now();
-    const fileName = `community/${userId}/${timestamp}_${file.name}`;
+    // Use a sanitized filename
+    const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const fileName = `community/${userId}/${timestamp}_${sanitizedName}`;
     const storageRef = ref(storage, fileName);
     
     await uploadBytes(storageRef, file);
@@ -524,6 +527,25 @@ export async function uploadPostImage(file: File, userId: string): Promise<strin
     return downloadURL;
   } catch (error) {
     console.error('Error uploading image:', error);
+    throw error;
+  }
+}
+
+// Upload community image to Firebase Storage
+export async function uploadCommunityImage(file: File, userId: string): Promise<string> {
+  try {
+    const timestamp = Date.now();
+    // Use a sanitized filename
+    const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const fileName = `communities/${userId}/${timestamp}_${sanitizedName}`;
+    const storageRef = ref(storage, fileName);
+    
+    await uploadBytes(storageRef, file);
+    const downloadURL = await getDownloadURL(storageRef);
+    
+    return downloadURL;
+  } catch (error) {
+    console.error('Error uploading community image:', error);
     throw error;
   }
 }
@@ -784,6 +806,156 @@ export async function getCommunitiesByCreator(userId: string, limitCount: number
   } catch (error) {
     console.error('Error fetching communities by creator:', error);
     return [];
+  }
+}
+
+// Delete a community (only by creator)
+export async function deleteCommunity(communityId: string, userId: string): Promise<void> {
+  try {
+    const communityRef = doc(db, 'communities', communityId);
+    const communitySnap = await getDoc(communityRef);
+
+    if (!communitySnap.exists()) {
+      throw new Error('Community not found');
+    }
+
+    const communityData = communitySnap.data() as Community;
+    if (communityData.creatorId !== userId) {
+      throw new Error('Only the creator can delete this community');
+    }
+
+    // Delete community image from storage if exists
+    if (communityData.imageUrl) {
+      try {
+        // Extract path from URL
+          const urlParts = communityData.imageUrl.split('/');
+          const pathIndex = urlParts.findIndex((part: string) => part === 'o');
+        if (pathIndex !== -1 && pathIndex < urlParts.length - 1) {
+          const encodedPath = urlParts[pathIndex + 1].split('?')[0];
+          const decodedPath = decodeURIComponent(encodedPath);
+          const imageRef = ref(storage, decodedPath);
+          await deleteObject(imageRef);
+        }
+      } catch (storageError) {
+        console.warn('Failed to delete community image from storage:', storageError);
+        // Continue with community deletion even if image deletion fails
+      }
+    }
+
+    // Delete all posts in this community
+    const postsQuery = query(
+      collection(db, 'community_posts'),
+      where('communityId', '==', communityId)
+    );
+    const postsSnapshot = await getDocs(postsQuery);
+    const deletePostPromises = postsSnapshot.docs.map(async (postDoc) => {
+      const postData = postDoc.data();
+      // Delete post image if exists
+      if (postData.imageUrl) {
+        try {
+          const urlParts = postData.imageUrl.split('/');
+          const pathIndex = urlParts.findIndex((part: string) => part === 'o');
+          if (pathIndex !== -1 && pathIndex < urlParts.length - 1) {
+            const encodedPath = urlParts[pathIndex + 1].split('?')[0];
+            const decodedPath = decodeURIComponent(encodedPath);
+            const imageRef = ref(storage, decodedPath);
+            await deleteObject(imageRef);
+          }
+        } catch (storageError) {
+          console.warn('Failed to delete post image:', storageError);
+        }
+      }
+      return deleteDoc(doc(db, 'community_posts', postDoc.id));
+    });
+    await Promise.all(deletePostPromises);
+
+    // Delete all community memberships
+    const membersQuery = query(
+      collection(db, 'community_members'),
+      where('communityId', '==', communityId)
+    );
+    const membersSnapshot = await getDocs(membersQuery);
+    const deleteMemberPromises = membersSnapshot.docs.map(memberDoc =>
+      deleteDoc(doc(db, 'community_members', memberDoc.id))
+    );
+    await Promise.all(deleteMemberPromises);
+
+    // Finally delete the community
+    await deleteDoc(communityRef);
+  } catch (error) {
+    console.error('Error deleting community:', error);
+    throw error;
+  }
+}
+
+// Delete a post (only by author)
+export async function deletePost(postId: string, userId: string): Promise<void> {
+  try {
+    const postRef = doc(db, 'community_posts', postId);
+    const postSnap = await getDoc(postRef);
+
+    if (!postSnap.exists()) {
+      throw new Error('Post not found');
+    }
+
+    const postData = postSnap.data() as CommunityPost;
+    if (postData.authorId !== userId) {
+      throw new Error('Only the author can delete this post');
+    }
+
+    // Delete post image from storage if exists
+    if (postData.imageUrl) {
+      try {
+          const urlParts = postData.imageUrl.split('/');
+          const pathIndex = urlParts.findIndex((part: string) => part === 'o');
+        if (pathIndex !== -1 && pathIndex < urlParts.length - 1) {
+          const encodedPath = urlParts[pathIndex + 1].split('?')[0];
+          const decodedPath = decodeURIComponent(encodedPath);
+          const imageRef = ref(storage, decodedPath);
+          await deleteObject(imageRef);
+        }
+      } catch (storageError) {
+        console.warn('Failed to delete post image from storage:', storageError);
+        // Continue with post deletion even if image deletion fails
+      }
+    }
+
+    // Delete all comments for this post
+    const commentsQuery = query(
+      collection(db, 'comments'),
+      where('postId', '==', postId)
+    );
+    const commentsSnapshot = await getDocs(commentsQuery);
+    const deleteCommentPromises = commentsSnapshot.docs.map(commentDoc =>
+      deleteDoc(doc(db, 'comments', commentDoc.id))
+    );
+    await Promise.all(deleteCommentPromises);
+
+    // Delete all votes for this post
+    const votesQuery = query(
+      collection(db, 'votes'),
+      where('postId', '==', postId)
+    );
+    const votesSnapshot = await getDocs(votesQuery);
+    const deleteVotePromises = votesSnapshot.docs.map(voteDoc =>
+      deleteDoc(doc(db, 'votes', voteDoc.id))
+    );
+    await Promise.all(deleteVotePromises);
+
+    // Decrement post count in community if post belongs to a community
+    if (postData.communityId) {
+      const communityRef = doc(db, 'communities', postData.communityId);
+      await updateDoc(communityRef, {
+        postCount: increment(-1),
+        updatedAt: serverTimestamp()
+      });
+    }
+
+    // Finally delete the post
+    await deleteDoc(postRef);
+  } catch (error) {
+    console.error('Error deleting post:', error);
+    throw error;
   }
 }
 

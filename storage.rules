@@ -1,0 +1,33 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // User profile images
+    match /profiles/{userId}/{allPaths=**} {
+      allow read: if true; // Public read for profile images
+      allow write: if request.auth != null && request.auth.uid == userId;
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Analysis/upload images
+    match /images/{userId}/{allPaths=**} {
+      allow read: if request.auth != null; // Authenticated users can read
+      allow write: if request.auth != null && request.auth.uid == userId;
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Community post images
+    match /community/{userId}/{allPaths=**} {
+      allow read: if true; // Public read for community post images
+      allow write: if request.auth != null && request.auth.uid == userId;
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Community banner images
+    match /communities/{userId}/{allPaths=**} {
+      allow read: if true; // Public read for community images
+      allow write: if request.auth != null && request.auth.uid == userId;
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
+

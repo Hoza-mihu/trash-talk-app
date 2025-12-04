@@ -3,9 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, MessageSquare, ThumbsUp, ThumbsDown, Leaf, Send } from 'lucide-react';
+import { ArrowLeft, MessageSquare, ThumbsUp, ThumbsDown, Leaf, Send, Trash2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { getPostById, addComment, getCommentsByPostId, voteOnPost, getUserVote, Comment } from '@/lib/community';
+import { getPostById, addComment, getCommentsByPostId, voteOnPost, getUserVote, deletePost, Comment } from '@/lib/community';
 import { CommunityPost } from '@/lib/community';
 import { CATEGORY_COLORS } from '@/lib/stats';
 
@@ -22,6 +22,7 @@ export default function PostDetailPage() {
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [userVote, setUserVote] = useState<'upvote' | 'downvote' | null>(null);
 
   useEffect(() => {
@@ -125,6 +126,25 @@ export default function PostDetailPage() {
       await loadUserVote(); // Reload user's vote status
     } catch (error) {
       console.error('Error voting:', error);
+    }
+  };
+
+  const handleDeletePost = async () => {
+    if (!user || !post) return;
+    
+    if (!confirm('Are you sure you want to delete this post? This will also delete all comments. This action cannot be undone.')) {
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      await deletePost(postId, user.uid);
+      alert('Post deleted successfully!');
+      router.push('/community');
+    } catch (error: any) {
+      console.error('Error deleting post:', error);
+      alert(error.message || 'Failed to delete post. Please try again.');
+      setDeleting(false);
     }
   };
 
@@ -313,12 +333,24 @@ export default function PostDetailPage() {
                 {post.content}
               </div>
 
-              <div className="flex items-center gap-4 text-sm text-gray-500 border-t pt-4">
-                <span>by {post.authorName}</span>
-                <span className="flex items-center gap-1">
-                  <MessageSquare className="w-4 h-4" />
-                  {post.commentCount} comments
-                </span>
+              <div className="flex items-center justify-between border-t pt-4">
+                <div className="flex items-center gap-4 text-sm text-gray-500">
+                  <span>by {post.authorName}</span>
+                  <span className="flex items-center gap-1">
+                    <MessageSquare className="w-4 h-4" />
+                    {post.commentCount} comments
+                  </span>
+                </div>
+                {user && post.authorId === user.uid && (
+                  <button
+                    onClick={handleDeletePost}
+                    disabled={deleting}
+                    className="flex items-center gap-2 text-red-600 hover:text-red-700 text-sm font-medium disabled:opacity-50"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    {deleting ? 'Deleting...' : 'Delete Post'}
+                  </button>
+                )}
               </div>
             </div>
           </div>

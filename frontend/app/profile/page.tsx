@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Leaf, User, Phone, Mail, Calendar, LogOut, MessageSquare, Users, Plus } from 'lucide-react';
+import { Leaf, User, Phone, Mail, Calendar, LogOut, MessageSquare, Users, Plus, Trash2, Image as ImageIcon } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import {
   createUserProfile,
@@ -16,9 +16,12 @@ import { createDefaultUserStats, type UserStats } from '@/lib/stats';
 import {
   getPostsByUser,
   getCommunitiesByCreator,
+  deletePost,
+  deleteCommunity,
   type CommunityPost,
   type Community
 } from '@/lib/community';
+import { deleteAnalysisResult, getUserAnalyses } from '@/lib/utils';
 import { storage } from '@/lib/firebase';
 import { ref, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 
@@ -44,8 +47,11 @@ export default function ProfilePage() {
   const [stats, setStats] = useState<UserStats>(createDefaultUserStats());
   const [userPosts, setUserPosts] = useState<CommunityPost[]>([]);
   const [userCommunities, setUserCommunities] = useState<Community[]>([]);
+  const [userAnalyses, setUserAnalyses] = useState<Array<{ id: string; [key: string]: any }>>([]);
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [loadingCommunities, setLoadingCommunities] = useState(true);
+  const [loadingAnalyses, setLoadingAnalyses] = useState(true);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -94,24 +100,87 @@ export default function ProfilePage() {
       
       setLoadingPosts(true);
       setLoadingCommunities(true);
+      setLoadingAnalyses(true);
       
       try {
-        const [posts, communities] = await Promise.all([
+        const [posts, communities, analyses] = await Promise.all([
           getPostsByUser(user.uid, 10),
-          getCommunitiesByCreator(user.uid, 10)
+          getCommunitiesByCreator(user.uid, 10),
+          getUserAnalyses(user.uid)
         ]);
         setUserPosts(posts);
         setUserCommunities(communities);
+        setUserAnalyses(analyses);
       } catch (error) {
         console.error('Error loading user content:', error);
       } finally {
         setLoadingPosts(false);
         setLoadingCommunities(false);
+        setLoadingAnalyses(false);
       }
     };
 
     loadUserContent();
   }, [user]);
+
+  const handleDeletePost = async (postId: string) => {
+    if (!user || !confirm('Are you sure you want to delete this post? This action cannot be undone.')) {
+      return;
+    }
+
+    setDeleting(`post-${postId}`);
+    try {
+      await deletePost(postId, user.uid);
+      setUserPosts(posts => posts.filter(p => p.id !== postId));
+      alert('Post deleted successfully!');
+    } catch (error: any) {
+      console.error('Error deleting post:', error);
+      alert(error.message || 'Failed to delete post. Please try again.');
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const handleDeleteCommunity = async (communityId: string) => {
+    if (!user || !confirm('Are you sure you want to delete this community? This will also delete all posts in this community. This action cannot be undone.')) {
+      return;
+    }
+
+    setDeleting(`community-${communityId}`);
+    try {
+      await deleteCommunity(communityId, user.uid);
+      setUserCommunities(communities => communities.filter(c => c.id !== communityId));
+      alert('Community deleted successfully!');
+    } catch (error: any) {
+      console.error('Error deleting community:', error);
+      alert(error.message || 'Failed to delete community. Please try again.');
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const handleDeleteAnalysis = async (analysisId: string) => {
+    if (!user || !confirm('Are you sure you want to delete this analysis? This action cannot be undone.')) {
+      return;
+    }
+
+    setDeleting(`analysis-${analysisId}`);
+    try {
+      await deleteAnalysisResult(analysisId, user.uid);
+      setUserAnalyses(analyses => analyses.filter(a => a.id !== analysisId));
+      // Reload stats after deletion
+      const statsData = await getUserStats(user.uid);
+      if (statsData) {
+        setStats(statsData);
+      }
+      alert('Analysis deleted successfully!');
+    } catch (error: any) {
+      console.error('Error deleting analysis:', error);
+      alert(error.message || 'Failed to delete analysis. Please try again.');
+    } finally {
+      setDeleting(null);
+    }
+  };
 
   const formatDate = (date: any) => {
     if (!date) return 'Recently';
@@ -496,21 +565,36 @@ export default function ProfilePage() {
           ) : (
             <div className="space-y-4">
               {userPosts.map((post) => (
-                <Link
+                <div
                   key={post.id}
-                  href={`/community/post/${post.id}`}
-                  className="block p-4 border border-gray-200 rounded-lg hover:border-green-300 hover:shadow-md transition-all"
+                  className="group p-4 border border-gray-200 rounded-lg hover:border-green-300 hover:shadow-md transition-all"
                 >
-                  <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{post.title}</h3>
-                  <p className="text-sm text-gray-600 mb-3 line-clamp-2">{post.content}</p>
-                  <div className="flex items-center gap-4 text-xs text-gray-500">
-                    <span>{formatDate(post.createdAt)}</span>
-                    <span>•</span>
-                    <span>{post.upvotes - post.downvotes} votes</span>
-                    <span>•</span>
-                    <span>{post.commentCount} comments</span>
-                  </div>
-                </Link>
+                  <Link
+                    href={`/community/post/${post.id}`}
+                    className="block"
+                  >
+                    <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{post.title}</h3>
+                    <p className="text-sm text-gray-600 mb-3 line-clamp-2">{post.content}</p>
+                    <div className="flex items-center gap-4 text-xs text-gray-500">
+                      <span>{formatDate(post.createdAt)}</span>
+                      <span>•</span>
+                      <span>{post.upvotes - post.downvotes} votes</span>
+                      <span>•</span>
+                      <span>{post.commentCount} comments</span>
+                    </div>
+                  </Link>
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleDeletePost(post.id!);
+                    }}
+                    disabled={deleting === `post-${post.id}`}
+                    className="mt-2 flex items-center gap-2 text-red-600 hover:text-red-700 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    {deleting === `post-${post.id}` ? 'Deleting...' : 'Delete'}
+                  </button>
+                </div>
               ))}
               {userPosts.length >= 10 && (
                 <Link
@@ -588,6 +672,70 @@ export default function ProfilePage() {
                     <span>Created {formatDate(community.createdAt)}</span>
                   </div>
                 </Link>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* My Uploads/Analyses */}
+        <section className="bg-white rounded-2xl shadow-lg p-6 lg:col-span-2">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <ImageIcon className="w-6 h-6 text-green-600" />
+              My Uploads & Analyses
+            </h2>
+          </div>
+
+          {loadingAnalyses ? (
+            <div className="text-center py-8">
+              <div className="animate-spin w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full mx-auto mb-2"></div>
+              <p className="text-gray-500 text-sm">Loading analyses...</p>
+            </div>
+          ) : userAnalyses.length === 0 ? (
+            <div className="text-center py-8">
+              <ImageIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-600 mb-4">You haven't uploaded any analyses yet.</p>
+              <Link
+                href="/upload"
+                className="inline-block bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 transition-colors text-sm"
+              >
+                Upload Your First Analysis
+              </Link>
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {userAnalyses.map((analysis) => (
+                <div
+                  key={analysis.id}
+                  className="group p-4 border border-gray-200 rounded-lg hover:border-green-300 hover:shadow-md transition-all"
+                >
+                  {analysis.imageUrl && (
+                    <img
+                      src={analysis.imageUrl}
+                      alt={analysis.item || 'Analysis'}
+                      className="w-full h-32 object-cover rounded-lg mb-3"
+                    />
+                  )}
+                  <h3 className="font-semibold text-gray-900 mb-1 line-clamp-1">
+                    {analysis.item || 'Unknown Item'}
+                  </h3>
+                  <p className="text-xs text-gray-500 mb-2">
+                    {analysis.category || 'Other'} • {analysis.confidence ? `${(analysis.confidence * 100).toFixed(0)}%` : 'N/A'} confidence
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-500">
+                      {formatDate(analysis.timestamp)}
+                    </span>
+                    <button
+                      onClick={() => handleDeleteAnalysis(analysis.id)}
+                      disabled={deleting === `analysis-${analysis.id}`}
+                      className="flex items-center gap-1 text-red-600 hover:text-red-700 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      {deleting === `analysis-${analysis.id}` ? 'Deleting...' : 'Delete'}
+                    </button>
+                  </div>
+                </div>
               ))}
             </div>
           )}

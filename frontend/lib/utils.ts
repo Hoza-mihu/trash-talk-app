@@ -1,5 +1,5 @@
-import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { collection, addDoc, query, where, getDocs, doc, deleteDoc, getDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from './firebase';
 import {
   createDefaultUserStats,
@@ -79,6 +79,61 @@ export function formatDate(dateString: string) {
     month: 'short', 
     day: 'numeric' 
   });
+}
+
+// Delete an analysis result (only by owner)
+export async function deleteAnalysisResult(analysisId: string, userId: string): Promise<void> {
+  try {
+    const analysisRef = doc(db, 'analyses', analysisId);
+    const analysisSnap = await getDoc(analysisRef);
+
+    if (!analysisSnap.exists()) {
+      throw new Error('Analysis not found');
+    }
+
+    const analysisData = analysisSnap.data();
+    if (analysisData.userId !== userId) {
+      throw new Error('Only the owner can delete this analysis');
+    }
+
+    // Delete image from storage if exists
+    if (analysisData.imageUrl) {
+      try {
+        const urlParts = analysisData.imageUrl.split('/');
+        const pathIndex = urlParts.findIndex((part: string) => part === 'o');
+        if (pathIndex !== -1 && pathIndex < urlParts.length - 1) {
+          const encodedPath = urlParts[pathIndex + 1].split('?')[0];
+          const decodedPath = decodeURIComponent(encodedPath);
+          const imageRef = ref(storage, decodedPath);
+          await deleteObject(imageRef);
+        }
+      } catch (storageError) {
+        console.warn('Failed to delete analysis image from storage:', storageError);
+        // Continue with analysis deletion even if image deletion fails
+      }
+    }
+
+    // Delete the analysis document
+    await deleteDoc(analysisRef);
+  } catch (error) {
+    console.error('Error deleting analysis:', error);
+    throw error;
+  }
+}
+
+// Get all analysis results for a user
+export async function getUserAnalyses(userId: string): Promise<Array<{ id: string; [key: string]: any }>> {
+  try {
+    const q = query(collection(db, 'analyses'), where('userId', '==', userId));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+  } catch (error) {
+    console.error('Error getting user analyses:', error);
+    return [];
+  }
 }
 
 // Calculate environmental impact

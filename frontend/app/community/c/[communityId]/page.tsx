@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Leaf, Users, Plus, MessageSquare, TrendingUp, Filter } from 'lucide-react';
+import { ArrowLeft, Leaf, Users, Plus, MessageSquare, TrendingUp, Filter, Trash2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import {
   getCommunityById,
@@ -11,6 +11,7 @@ import {
   joinCommunity,
   leaveCommunity,
   isCommunityMember,
+  deleteCommunity,
   Community,
   CommunityPost
 } from '@/lib/community';
@@ -27,6 +28,7 @@ export default function CommunityPage() {
   const [isMember, setIsMember] = useState(false);
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (communityId) {
@@ -95,6 +97,25 @@ export default function CommunityPage() {
       alert('Failed to join/leave community. Please try again.');
     } finally {
       setJoining(false);
+    }
+  };
+
+  const handleDeleteCommunity = async () => {
+    if (!user || !community) return;
+    
+    if (!confirm('Are you sure you want to delete this community? This will also delete all posts in this community. This action cannot be undone.')) {
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      await deleteCommunity(communityId, user.uid);
+      alert('Community deleted successfully!');
+      router.push('/community');
+    } catch (error: any) {
+      console.error('Error deleting community:', error);
+      alert(error.message || 'Failed to delete community. Please try again.');
+      setDeleting(false);
     }
   };
 
@@ -192,7 +213,17 @@ export default function CommunityPage() {
                     )}
                   </div>
                 </div>
-                <div>
+                <div className="flex items-center gap-3">
+                  {user && community.creatorId === user.uid && (
+                    <button
+                      onClick={handleDeleteCommunity}
+                      disabled={deleting}
+                      className="px-6 py-2 rounded-lg font-semibold transition-colors bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      {deleting ? 'Deleting...' : 'Delete'}
+                    </button>
+                  )}
                   <button
                     onClick={handleJoinLeave}
                     disabled={joining}
