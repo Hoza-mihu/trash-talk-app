@@ -111,6 +111,8 @@ export default function Home() {
         </div>
       </div>
 
+      {/* Main Content Container */}
+      <div className="max-w-7xl mx-auto px-4">
         {/* How It Works Section */}
         <div className="mt-20" id="how-it-works" ref={(el) => { sectionRefs.current['how-it-works'] = el; }}>
           <h2 className={`text-4xl font-bold text-center text-gray-900 mb-12 transition-all duration-700 ${
@@ -185,7 +187,6 @@ export default function Home() {
             ))}
           </div>
         </div>
-
       </div>
 
       {/* CTA Section */}
