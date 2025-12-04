@@ -41,8 +41,8 @@ export interface Community {
 
 export interface CommunityPost {
   id?: string;
-  title: string;
-  content: string;
+  title?: string; // Optional - can post with just image
+  content?: string; // Optional - can post with just image and title
   category: WasteCategoryKey;
   communityId?: string; // Optional: which community this post belongs to
   authorId: string;
@@ -92,8 +92,9 @@ export async function createPost(
       throw new Error('User ID and name are required');
     }
     
-    if (!postData.title || !postData.content) {
-      throw new Error('Title and content are required');
+    // At least one of: title, content, or imageUrl must be provided
+    if (!postData.title && !postData.content && !postData.imageUrl) {
+      throw new Error('Please provide at least a title, content, or image');
     }
 
     if (!postData.category) {
@@ -459,8 +460,8 @@ export async function searchPosts(searchTerm: string, limitCount: number = 20): 
         ...doc.data()
       } as CommunityPost))
       .filter(post => 
-        post.title.toLowerCase().includes(searchLower) ||
-        post.content.toLowerCase().includes(searchLower) ||
+        post.title?.toLowerCase().includes(searchLower) ||
+        post.content?.toLowerCase().includes(searchLower) ||
         post.tags?.some(tag => tag.toLowerCase().includes(searchLower))
       )
       .slice(0, limitCount);

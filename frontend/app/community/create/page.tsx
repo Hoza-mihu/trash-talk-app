@@ -114,7 +114,13 @@ function CreatePostForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !title.trim() || !content.trim() || submitting || isSubmittingRef.current) return;
+    if (!user || submitting || isSubmittingRef.current) return;
+    
+    // At least one of: title, content, or image must be provided
+    if (!title.trim() && !content.trim() && !imageFile) {
+      alert('Please provide at least a title, content, or image.');
+      return;
+    }
 
     // Prevent double submission
     isSubmittingRef.current = true;
@@ -146,8 +152,8 @@ function CreatePostForm() {
         }
 
         const postData = {
-          title: title.trim(),
-          content: content.trim(),
+          title: title.trim() || undefined,
+          content: content.trim() || undefined,
           category,
           communityId: selectedCommunity || undefined,
           isTip,
@@ -296,10 +302,9 @@ function CreatePostForm() {
               <textarea
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                placeholder="Share your tip, question, or experience..."
+                placeholder="Share your tip, question, or experience (optional)..."
                 className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 !text-black placeholder:text-gray-400"
                 rows={10}
-                required
               />
             </div>
 

@@ -333,8 +333,19 @@ export default function CommunityPage() {
                           )}
                           <span className="text-xs text-gray-500">{formatDate(post.createdAt)}</span>
                         </div>
-                        <h3 className="text-lg font-bold text-gray-900 mb-1 line-clamp-2">{post.title}</h3>
-                        <p className="text-gray-700 mb-3 line-clamp-2 text-sm">{post.content}</p>
+                        {post.title && (
+                          <h3 className="text-lg font-bold text-gray-900 mb-1 line-clamp-2">{post.title}</h3>
+                        )}
+                        {post.imageUrl && (
+                          <div className="mb-3">
+                            <img 
+                              src={post.imageUrl} 
+                              alt={post.title || 'Post image'} 
+                              className="w-full rounded-lg max-h-96 object-cover"
+                            />
+                          </div>
+                        )}
+                        {/* Content is hidden in feed - shown only on detail page */}
                         <div className="flex items-center gap-4 text-xs text-gray-500">
                           <Link
                             href={`/community/user/${post.authorId}`}
