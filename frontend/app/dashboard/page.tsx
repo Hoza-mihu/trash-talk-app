@@ -244,7 +244,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Navigation */}
-      <nav className="bg-white/80 backdrop-blur-sm shadow-sm sticky top-0 z-50 relative">
+      <nav className="bg-white/80 backdrop-blur-sm shadow-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2 group">
             <Leaf className="w-8 h-8 text-green-600 group-hover:rotate-12 transition-transform duration-300" />
