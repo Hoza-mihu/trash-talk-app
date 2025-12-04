@@ -55,6 +55,8 @@ export default function CommunityPage() {
   const [isFavorite, setIsFavorite] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [highlights, setHighlights] = useState<CommunityPost[]>([]);
+  const [latestPosts, setLatestPosts] = useState<CommunityPost[]>([]);
+  const [topPosts, setTopPosts] = useState<CommunityPost[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -130,10 +132,44 @@ export default function CommunityPage() {
 
   const loadHighlights = async () => {
     try {
-      // Get top 3 posts by upvotes from this community
+      // Get all posts from this community
       const allPosts = await getPostsByCommunity(communityId, 50);
-      const sorted = [...allPosts].sort((a, b) => (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes));
-      setHighlights(sorted.slice(0, 3));
+      
+      // Get latest 3 posts (sorted by createdAt, most recent first)
+      const latest = [...allPosts]
+        .sort((a, b) => {
+          const getTime = (date: any): number => {
+            if (!date) return 0;
+            // Check if it's a Firestore Timestamp
+            if (date.toMillis && typeof date.toMillis === 'function') {
+              return date.toMillis();
+            }
+            // Check if it's a Date object
+            if (date instanceof Date) {
+              return date.getTime();
+            }
+            // Try to convert to Date
+            try {
+              return new Date(date).getTime();
+            } catch {
+              return 0;
+            }
+          };
+          const aTime = getTime(a.createdAt);
+          const bTime = getTime(b.createdAt);
+          return bTime - aTime;
+        })
+        .slice(0, 3);
+      setLatestPosts(latest);
+      
+      // Get top 3 posts by upvotes (score = upvotes - downvotes)
+      const top = [...allPosts]
+        .sort((a, b) => (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes))
+        .slice(0, 3);
+      setTopPosts(top);
+      
+      // Keep highlights for backward compatibility (use top posts)
+      setHighlights(top);
     } catch (error) {
       console.error('Error loading highlights:', error);
     }
@@ -682,50 +718,110 @@ export default function CommunityPage() {
             </div>
 
             {/* Community Highlights */}
-            {highlights.length > 0 && (
+            {(latestPosts.length > 0 || topPosts.length > 0) && (
               <div className="bg-white rounded-lg border border-gray-200 p-4">
                 <div className="flex items-center gap-2 mb-4">
                   <Rocket className="w-4 h-4 text-gray-500" />
                   <h2 className="text-sm font-semibold text-gray-900">Community highlights</h2>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {highlights.map((post) => (
-                    <Link
-                      key={post.id}
-                      href={`/community/post/${post.id}`}
-                      className="block p-3 rounded-lg border border-gray-200 hover:border-green-500 hover:bg-green-50 transition-all cursor-pointer"
-                    >
-                      <h3 className="text-sm font-semibold text-gray-900 line-clamp-2 mb-2">
-                        {post.title}
-                      </h3>
-                      {post.imageUrl && (
-                        <div className="mb-2">
-                          <img
-                            src={post.imageUrl}
-                            alt={post.title}
-                            className="w-full h-24 object-cover rounded"
-                          />
-                        </div>
-                      )}
-                      <div className="flex items-center gap-2 mt-2">
-                        {post.isTip && (
-                          <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
-                            💡 Tip
-                          </span>
-                        )}
-                        <span className="text-xs text-gray-500">
-                          {post.upvotes - post.downvotes} upvotes
-                        </span>
-                        {post.commentCount > 0 && (
-                          <>
-                            <span className="text-xs text-gray-400">•</span>
-                            <span className="text-xs text-gray-500">{post.commentCount} comments</span>
-                          </>
-                        )}
-                      </div>
-                    </Link>
-                  ))}
-                </div>
+                
+                {/* Latest Posts */}
+                {latestPosts.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-xs font-semibold text-gray-700 mb-3 uppercase tracking-wide">Latest</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      {latestPosts.map((post) => (
+                        <Link
+                          key={post.id}
+                          href={`/community/post/${post.id}`}
+                          className="block p-3 rounded-lg border border-gray-200 hover:border-green-500 hover:bg-green-50 transition-all cursor-pointer"
+                        >
+                          {post.imageUrl && (
+                            <div className="mb-2">
+                              <img
+                                src={post.imageUrl}
+                                alt={post.title}
+                                className="w-full h-32 object-cover rounded"
+                              />
+                            </div>
+                          )}
+                          <h3 className="text-sm font-semibold text-gray-900 line-clamp-2 mb-2">
+                            {post.title}
+                          </h3>
+                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                            <span>{post.upvotes - post.downvotes} upvotes</span>
+                            {post.commentCount > 0 && (
+                              <>
+                                <span>•</span>
+                                <span>{post.commentCount} comments</span>
+                              </>
+                            )}
+                            {post.createdAt && (
+                              <>
+                                <span>•</span>
+                                <span>{formatDate(post.createdAt)}</span>
+                              </>
+                            )}
+                          </div>
+                          {post.isTip && (
+                            <span className="inline-block mt-2 px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
+                              💡 Tip
+                            </span>
+                          )}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Top Posts */}
+                {topPosts.length > 0 && (
+                  <div>
+                    <h3 className="text-xs font-semibold text-gray-700 mb-3 uppercase tracking-wide">Top</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      {topPosts.map((post) => (
+                        <Link
+                          key={post.id}
+                          href={`/community/post/${post.id}`}
+                          className="block p-3 rounded-lg border border-gray-200 hover:border-green-500 hover:bg-green-50 transition-all cursor-pointer"
+                        >
+                          {post.imageUrl && (
+                            <div className="mb-2">
+                              <img
+                                src={post.imageUrl}
+                                alt={post.title}
+                                className="w-full h-32 object-cover rounded"
+                              />
+                            </div>
+                          )}
+                          <h3 className="text-sm font-semibold text-gray-900 line-clamp-2 mb-2">
+                            {post.title}
+                          </h3>
+                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                            <span className="font-semibold text-green-600">{post.upvotes - post.downvotes} upvotes</span>
+                            {post.commentCount > 0 && (
+                              <>
+                                <span>•</span>
+                                <span>{post.commentCount} comments</span>
+                              </>
+                            )}
+                            {post.createdAt && (
+                              <>
+                                <span>•</span>
+                                <span>{formatDate(post.createdAt)}</span>
+                              </>
+                            )}
+                          </div>
+                          {post.isTip && (
+                            <span className="inline-block mt-2 px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
+                              💡 Tip
+                            </span>
+                          )}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
