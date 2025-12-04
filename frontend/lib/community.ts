@@ -16,7 +16,9 @@ import {
   QueryDocumentSnapshot,
   DocumentData,
   setDoc,
-  getDoc as getFirestoreDoc
+  getDoc as getFirestoreDoc,
+  onSnapshot,
+  Unsubscribe
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from './firebase';
@@ -84,6 +86,19 @@ export interface Vote {
   type: 'upvote' | 'downvote';
 }
 
+export interface Notification {
+  id?: string;
+  userId: string;
+  type: 'new_post' | 'new_comment' | 'new_reply';
+  communityId?: string;
+  postId?: string;
+  commentId?: string;
+  title: string;
+  message: string;
+  read: boolean;
+  createdAt: Timestamp | Date;
+}
+
 // Create a new post
 export async function createPost(
   userId: string,
@@ -129,6 +144,23 @@ export async function createPost(
     });
 
     const docRef = await addDoc(collection(db, 'community_posts'), postPayload);
+    
+    // If post belongs to a community, increment its post count and notify members
+    if (postData.communityId) {
+      const communityRef = doc(db, 'communities', postData.communityId);
+      await updateDoc(communityRef, {
+        postCount: increment(1),
+        updatedAt: serverTimestamp()
+      });
+
+      // Notify all community members about the new post (except the author)
+      try {
+        await notifyCommunityMembers(postData.communityId, docRef.id, postData.title || 'Untitled', userName, userId);
+      } catch (notifyError) {
+        console.warn('Failed to send notifications:', notifyError);
+        // Don't fail post creation if notifications fail
+      }
+    }
     
     console.log('Post created successfully with ID:', docRef.id);
     return docRef.id;
@@ -1107,5 +1139,166 @@ export async function shareRecyclingStats(
   };
   
   return createPost(userId, userName, userPhotoUrl, postData);
+}
+
+// ========== NOTIFICATION FUNCTIONS ==========
+
+// Notify all members of a community about a new post
+async function notifyCommunityMembers(
+  communityId: string,
+  postId: string,
+  postTitle: string,
+  authorName: string,
+  authorId: string
+): Promise<void> {
+  try {
+    // Get all community members
+    const membersQuery = query(
+      collection(db, 'community_members'),
+      where('communityId', '==', communityId),
+      where('leftAt', '==', null)
+    );
+    const membersSnapshot = await getDocs(membersQuery);
+
+    // Get community name
+    const communityRef = doc(db, 'communities', communityId);
+    const communitySnap = await getDoc(communityRef);
+    const communityName = communitySnap.exists() ? communitySnap.data().name : 'Community';
+
+    // Create notifications for all members (except the post author)
+    const notifications: Array<{
+      userId: string;
+      type: 'new_post';
+      communityId: string;
+      postId: string;
+      title: string;
+      message: string;
+      read: boolean;
+      createdAt: any;
+    }> = [];
+    membersSnapshot.docs.forEach((memberDoc) => {
+      const memberData = memberDoc.data();
+      const memberId = memberData.userId;
+      
+      // Don't notify the post author
+      if (memberId !== authorId) {
+        notifications.push({
+          userId: memberId,
+          type: 'new_post' as const,
+          communityId,
+          postId,
+          title: `New post in r/${communityName}`,
+          message: `${authorName} posted: ${postTitle}`,
+          read: false,
+          createdAt: serverTimestamp()
+        });
+      }
+    });
+
+    // Batch create notifications (Firestore allows up to 500 operations per batch)
+    const batchSize = 500;
+    for (let i = 0; i < notifications.length; i += batchSize) {
+      const batch = notifications.slice(i, i + batchSize);
+      await Promise.all(
+        batch.map((notification) => addDoc(collection(db, 'notifications'), notification))
+      );
+    }
+  } catch (error) {
+    console.error('Error notifying community members:', error);
+    throw error;
+  }
+}
+
+// Get user notifications
+export async function getUserNotifications(userId: string, limitCount: number = 20): Promise<Notification[]> {
+  try {
+    const q = query(
+      collection(db, 'notifications'),
+      where('userId', '==', userId),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
+    );
+
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as Notification));
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    return [];
+  }
+}
+
+// Get unread notification count
+export async function getUnreadNotificationCount(userId: string): Promise<number> {
+  try {
+    const q = query(
+      collection(db, 'notifications'),
+      where('userId', '==', userId),
+      where('read', '==', false)
+    );
+
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.size;
+  } catch (error) {
+    console.error('Error getting unread count:', error);
+    return 0;
+  }
+}
+
+// Mark notification as read
+export async function markNotificationAsRead(notificationId: string): Promise<void> {
+  try {
+    const notificationRef = doc(db, 'notifications', notificationId);
+    await updateDoc(notificationRef, {
+      read: true
+    });
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+    throw error;
+  }
+}
+
+// Mark all notifications as read
+export async function markAllNotificationsAsRead(userId: string): Promise<void> {
+  try {
+    const q = query(
+      collection(db, 'notifications'),
+      where('userId', '==', userId),
+      where('read', '==', false)
+    );
+
+    const querySnapshot = await getDocs(q);
+    const batch = querySnapshot.docs.map(doc => 
+      updateDoc(doc.ref, { read: true })
+    );
+
+    await Promise.all(batch);
+  } catch (error) {
+    console.error('Error marking all notifications as read:', error);
+    throw error;
+  }
+}
+
+// Subscribe to real-time notifications
+export function subscribeToNotifications(
+  userId: string,
+  callback: (notifications: Notification[]) => void
+): Unsubscribe {
+  const q = query(
+    collection(db, 'notifications'),
+    where('userId', '==', userId),
+    orderBy('createdAt', 'desc'),
+    limit(20)
+  );
+
+  return onSnapshot(q, (snapshot) => {
+    const notifications = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as Notification));
+    callback(notifications);
+  });
 }
 

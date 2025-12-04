@@ -15,8 +15,14 @@ import {
   updateCommunityImages,
   uploadCommunityBanner,
   uploadCommunityIcon,
+  getUserNotifications,
+  getUnreadNotificationCount,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+  subscribeToNotifications,
   Community,
-  CommunityPost
+  CommunityPost,
+  Notification
 } from '@/lib/community';
 import { CATEGORY_COLORS } from '@/lib/stats';
 
@@ -47,6 +53,9 @@ export default function CommunityPage() {
   const [isFavorite, setIsFavorite] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [highlights, setHighlights] = useState<CommunityPost[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   useEffect(() => {
     if (communityId) {
@@ -67,9 +76,53 @@ export default function CommunityPage() {
         const muted = JSON.parse(localStorage.getItem('mutedCommunities') || '[]');
         setIsFavorite(favorites.includes(communityId));
         setIsMuted(muted.includes(communityId));
+        loadNotifications();
+        // Subscribe to real-time notifications
+        const unsubscribe = subscribeToNotifications(user.uid, (notifs) => {
+          setNotifications(notifs);
+          setUnreadCount(notifs.filter(n => !n.read).length);
+        });
+        return () => unsubscribe();
       }
     }
   }, [communityId, sortOption, user]);
+
+  const loadNotifications = async () => {
+    if (!user) return;
+    try {
+      const notifs = await getUserNotifications(user.uid, 20);
+      setNotifications(notifs);
+      const count = await getUnreadNotificationCount(user.uid);
+      setUnreadCount(count);
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    }
+  };
+
+  const handleNotificationClick = async (notification: Notification) => {
+    if (!notification.read && notification.id) {
+      await markNotificationAsRead(notification.id);
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    }
+    
+    if (notification.postId) {
+      router.push(`/community/post/${notification.postId}`);
+    } else if (notification.communityId) {
+      router.push(`/community/c/${notification.communityId}`);
+    }
+    setShowNotifications(false);
+  };
+
+  const handleMarkAllAsRead = async () => {
+    if (!user) return;
+    try {
+      await markAllNotificationsAsRead(user.uid);
+      setUnreadCount(0);
+      loadNotifications();
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+    }
+  };
 
   const loadHighlights = async () => {
     try {
@@ -406,7 +459,7 @@ export default function CommunityPage() {
                             {deleting ? 'Deleting...' : 'Delete'}
                           </button>
                         )}
-                        {isMember && user && (
+                        {user && (
                           <Link
                             href={`/community/create?communityId=${communityId}`}
                             className="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors text-sm flex items-center gap-2"
@@ -415,10 +468,76 @@ export default function CommunityPage() {
                             Create Post
                           </Link>
                         )}
-                        {isMember && (
-                          <button className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
-                            <Bell className="w-5 h-5 text-gray-600" />
-                          </button>
+                        {isMember && user && (
+                          <div className="relative">
+                            <button
+                              onClick={() => setShowNotifications(!showNotifications)}
+                              className="p-2 rounded-lg hover:bg-gray-100 transition-colors relative"
+                            >
+                              <Bell className="w-5 h-5 text-gray-600" />
+                              {unreadCount > 0 && (
+                                <span className="absolute top-0 right-0 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                                  {unreadCount > 9 ? '9+' : unreadCount}
+                                </span>
+                              )}
+                            </button>
+                            {showNotifications && (
+                              <>
+                                <div
+                                  className="fixed inset-0 z-10"
+                                  onClick={() => setShowNotifications(false)}
+                                ></div>
+                                <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl z-20 border border-gray-200 max-h-96 overflow-y-auto">
+                                  <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                                    <h3 className="font-semibold text-gray-900">Notifications</h3>
+                                    {unreadCount > 0 && (
+                                      <button
+                                        onClick={handleMarkAllAsRead}
+                                        className="text-sm text-green-600 hover:text-green-700 font-medium"
+                                      >
+                                        Mark all as read
+                                      </button>
+                                    )}
+                                  </div>
+                                  <div className="divide-y divide-gray-200">
+                                    {notifications.length === 0 ? (
+                                      <div className="p-8 text-center text-gray-500">
+                                        <Bell className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                                        <p>No notifications yet</p>
+                                      </div>
+                                    ) : (
+                                      notifications.map((notification) => (
+                                        <button
+                                          key={notification.id}
+                                          onClick={() => handleNotificationClick(notification)}
+                                          className={`w-full text-left p-4 hover:bg-gray-50 transition-colors ${
+                                            !notification.read ? 'bg-green-50' : ''
+                                          }`}
+                                        >
+                                          <div className="flex items-start gap-3">
+                                            <div className={`flex-shrink-0 w-2 h-2 rounded-full mt-2 ${
+                                              !notification.read ? 'bg-green-500' : 'bg-transparent'
+                                            }`}></div>
+                                            <div className="flex-1 min-w-0">
+                                              <p className="font-semibold text-sm text-gray-900 mb-1">
+                                                {notification.title}
+                                              </p>
+                                              <p className="text-xs text-gray-600 line-clamp-2">
+                                                {notification.message}
+                                              </p>
+                                              <p className="text-xs text-gray-400 mt-1">
+                                                {formatDate(notification.createdAt)}
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </button>
+                                      ))
+                                    )}
+                                  </div>
+                                </div>
+                              </>
+                            )}
+                          </div>
                         )}
                         <button
                           onClick={handleJoinLeave}
