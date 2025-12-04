@@ -29,6 +29,9 @@ export default function Home() {
             <Link href="/community" className="text-gray-700 hover:text-green-600 font-medium">
               Community
             </Link>
+            <Link href="/about" className="text-gray-700 hover:text-green-600 font-medium">
+              About
+            </Link>
             <Link
               href={user ? '/profile' : '/auth'}
               className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 transition-colors"
@@ -122,97 +125,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* About Section */}
-        <div className="mt-20">
-          <div className="bg-white rounded-2xl p-12 shadow-lg">
-            <div className="text-center mb-12">
-              <h2 className="text-4xl font-bold text-gray-900 mb-4">About Eco-Eco</h2>
-              <div className="w-24 h-1 bg-green-600 mx-auto"></div>
-            </div>
-
-            <div className="max-w-4xl mx-auto space-y-8">
-              {/* Vision */}
-              <div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-3">
-                  <Leaf className="w-8 h-8 text-green-600" />
-                  Our Vision
-                </h3>
-                <p className="text-lg text-gray-700 leading-relaxed">
-                  To create a world where every individual understands the impact of their waste and is empowered 
-                  to make sustainable choices. We envision a future where waste management is intuitive, accessible, 
-                  and rewarding—where technology bridges the gap between environmental awareness and actionable change.
-                </p>
-              </div>
-
-              {/* Mission */}
-              <div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-3">
-                  <Recycle className="w-8 h-8 text-green-600" />
-                  Our Mission
-                </h3>
-                <p className="text-lg text-gray-700 leading-relaxed mb-4">
-                  Eco-Eco (Trash Talk) is committed to revolutionizing waste management through innovative technology. 
-                  Our mission is to:
-                </p>
-                <ul className="space-y-3 text-gray-700">
-                  <li className="flex items-start gap-3">
-                    <span className="text-green-600 font-bold mt-1">✓</span>
-                    <span>Make waste classification accessible to everyone through AI-powered image recognition</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <span className="text-green-600 font-bold mt-1">✓</span>
-                    <span>Educate users about proper recycling practices and environmental impact</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <span className="text-green-600 font-bold mt-1">✓</span>
-                    <span>Track and visualize individual contributions to environmental sustainability</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <span className="text-green-600 font-bold mt-1">✓</span>
-                    <span>Build a community of eco-conscious individuals sharing knowledge and best practices</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <span className="text-green-600 font-bold mt-1">✓</span>
-                    <span>Provide data-driven insights that inspire positive behavioral change</span>
-                  </li>
-                </ul>
-              </div>
-
-              {/* What We Do */}
-              <div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-3">
-                  <BarChart3 className="w-8 h-8 text-green-600" />
-                  What We Do
-                </h3>
-                <p className="text-lg text-gray-700 leading-relaxed">
-                  Eco-Eco combines cutting-edge artificial intelligence with user-friendly design to transform how 
-                  people interact with waste. Our platform uses deep learning models trained on thousands of waste 
-                  images to instantly classify items and provide personalized recycling guidance. Through real-time 
-                  impact tracking, community engagement, and educational resources, we empower users to make 
-                  informed decisions that benefit both their communities and the planet.
-                </p>
-              </div>
-
-              {/* Founder */}
-              <div className="mt-12 pt-8 border-t border-gray-200">
-                <div className="flex flex-col md:flex-row items-center gap-6">
-                  <div className="w-24 h-24 bg-gradient-to-br from-green-400 to-teal-500 rounded-full flex items-center justify-center text-white text-3xl font-bold shadow-lg">
-                    HM
-                  </div>
-                  <div className="text-center md:text-left">
-                    <h3 className="text-2xl font-bold text-gray-900 mb-2">Hoza Mihu</h3>
-                    <p className="text-lg text-green-600 font-semibold mb-3">Founder & Creator</p>
-                    <p className="text-gray-700 max-w-2xl">
-                      Hoza Mihu envisioned Eco-Eco as a solution to bridge the gap between environmental awareness 
-                      and practical action. With a passion for sustainability and technology, Hoza created this 
-                      platform to make waste management accessible, engaging, and impactful for everyone.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* CTA Section */}
