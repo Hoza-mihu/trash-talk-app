@@ -315,15 +315,22 @@ export default function CommunityPage() {
   const loadCommunity = async () => {
     try {
       const fetched = await getCommunityById(communityId);
+      if (!fetched) {
+        console.error('Community not found');
+        return;
+      }
+      
       setCommunity(fetched);
       
       // Calculate and update weekly stats if not already set
-      if (!fetched.weeklyVisitors || !fetched.weeklyContributions) {
+      if (fetched.weeklyVisitors === undefined || fetched.weeklyContributions === undefined) {
         try {
           await calculateWeeklyCommunityStats(communityId);
           // Reload to get updated stats
           const updated = await getCommunityById(communityId);
-          setCommunity(updated);
+          if (updated) {
+            setCommunity(updated);
+          }
         } catch (error) {
           console.error('Error calculating weekly stats:', error);
         }
