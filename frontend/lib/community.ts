@@ -2458,6 +2458,14 @@ export async function calculateWeeklyCommunityStats(communityId: string): Promis
     // Weekly contributions = posts created this week + comments created this week
     const weeklyContributions = postCount + commentCount;
 
+    console.log(`Weekly stats for ${communityId}:`, {
+      weeklyVisitors,
+      weeklyContributions,
+      postCount,
+      commentCount,
+      visitorSetSize: visitorSet.size
+    });
+
     // Update community stats
     const communityRef = doc(db, 'communities', communityId);
     await updateDoc(communityRef, {
@@ -2465,6 +2473,8 @@ export async function calculateWeeklyCommunityStats(communityId: string): Promis
       weeklyContributions,
       updatedAt: serverTimestamp()
     });
+
+    console.log('Updated community document with weekly stats');
 
     return { weeklyVisitors, weeklyContributions };
   } catch (error) {
