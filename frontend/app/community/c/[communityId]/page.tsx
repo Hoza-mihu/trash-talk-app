@@ -332,11 +332,14 @@ export default function CommunityPage() {
         console.log('[Community Page] Weekly stats calculated:', stats);
         
         // Update local state immediately with calculated stats (no need to wait for Firestore)
-        setCommunity(prev => ({
-          ...prev,
-          weeklyVisitors: stats.weeklyVisitors,
-          weeklyContributions: stats.weeklyContributions
-        }));
+        setCommunity(prev => {
+          if (!prev) return prev; // If community is not loaded yet, don't update
+          return {
+            ...prev,
+            weeklyVisitors: stats.weeklyVisitors,
+            weeklyContributions: stats.weeklyContributions
+          };
+        });
         
         // Also try to reload from Firestore after a short delay as a backup
         setTimeout(async () => {
