@@ -71,6 +71,15 @@ export const ENVIRONMENTAL_IMPACT_BY_CATEGORY: Record<WasteCategoryKey, Environm
     treesEquivalent: 0.001, // trees per item (compost enriches soil, supporting tree growth)
     energyConserved: 0.3 // kWh per item (avoided methane emissions)
   },
+  'E-Waste': {
+    // E-waste recycling: recovers valuable materials (gold, silver, copper, rare earths)
+    // Prevents toxic materials from entering landfills (lead, mercury, cadmium)
+    // High energy savings from material recovery vs mining new materials
+    // Average e-waste item ~500g: significant environmental impact
+    waterSaved: 8.0, // liters per item (mining new materials is very water-intensive)
+    treesEquivalent: 0.0, // e-waste doesn't directly relate to trees
+    energyConserved: 15.0 // kWh per item (recovering materials saves 80-90% energy vs mining)
+  },
   'Other': {
     // Default conservative values for unclassified items
     waterSaved: 1.0, // liters per item
