@@ -483,21 +483,48 @@ export default function DashboardPage() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-gray-700 font-medium flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CATEGORY_COLORS['E-Waste'] }}></div>
+                    E-Waste
+                  </span>
+                  <span className="text-sm font-bold text-gray-900">
+                    {userData.categories['E-Waste'].count}
+                  </span>
+                </div>
+                <div className="w-full h-6 bg-gray-200 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full transition-all duration-1000 ease-out flex items-center justify-end pr-2"
+                    style={{ 
+                      width: `${userData.totalItems ? (userData.categories['E-Waste'].count / userData.totalItems) * 100 : 0}%`,
+                      background: `linear-gradient(to right, ${CATEGORY_COLORS['E-Waste']}, ${CATEGORY_COLORS['E-Waste']}dd)`
+                    }}
+                  >
+                    {userData.categories['E-Waste'].count > 0 && (
+                      <span className="text-xs text-white font-semibold">
+                        {userData.totalItems ? Math.round((userData.categories['E-Waste'].count / userData.totalItems) * 100) : 0}%
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-gray-700 font-medium flex items-center gap-2">
                     <div className="w-3 h-3 bg-gray-500 rounded-full"></div>
                     Other Waste
                   </span>
                   <span className="text-sm font-bold text-gray-900">
-                    {userData.totalItems - userData.recyclableItems - userData.compostableItems}
+                    {userData.totalItems - userData.recyclableItems - userData.compostableItems - userData.categories['E-Waste'].count}
                   </span>
                 </div>
                 <div className="w-full h-6 bg-gray-200 rounded-full overflow-hidden">
                   <div 
                     className="h-full bg-gradient-to-r from-gray-500 to-gray-600 transition-all duration-1000 ease-out flex items-center justify-end pr-2"
-                    style={{ width: `${userData.totalItems ? ((userData.totalItems - userData.recyclableItems - userData.compostableItems) / userData.totalItems) * 100 : 0}%` }}
+                    style={{ width: `${userData.totalItems ? ((userData.totalItems - userData.recyclableItems - userData.compostableItems - userData.categories['E-Waste'].count) / userData.totalItems) * 100 : 0}%` }}
                   >
-                    {(userData.totalItems - userData.recyclableItems - userData.compostableItems) > 0 && (
+                    {(userData.totalItems - userData.recyclableItems - userData.compostableItems - userData.categories['E-Waste'].count) > 0 && (
                       <span className="text-xs text-white font-semibold">
-                        {userData.totalItems ? Math.round(((userData.totalItems - userData.recyclableItems - userData.compostableItems) / userData.totalItems) * 100) : 0}%
+                        {userData.totalItems ? Math.round(((userData.totalItems - userData.recyclableItems - userData.compostableItems - userData.categories['E-Waste'].count) / userData.totalItems) * 100) : 0}%
                       </span>
                     )}
                   </div>
