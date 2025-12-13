@@ -22,7 +22,7 @@ export default function PostDetailPage() {
   const [loading, setLoading] = useState(true);
   const [commentText, setCommentText] = useState('');
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
-  const [replyText, setReplyText] = useState('');
+  const [replyTexts, setReplyTexts] = useState<{ [key: string]: string }>({});
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [userVote, setUserVote] = useState<'upvote' | 'downvote' | null>(null);
@@ -99,6 +99,7 @@ export default function PostDetailPage() {
       setCommentText('');
       setReplyingTo(null);
       await loadComments();
+      await loadPost(); // Reload post to update comment count
     } catch (error) {
       console.error('Error submitting comment:', error);
       alert('Failed to post comment. Please try again.');
@@ -108,7 +109,7 @@ export default function PostDetailPage() {
   };
 
   const handleSubmitReply = async (parentId: string) => {
-    if (!user || !replyText.trim()) return;
+    if (!user || !replyTexts[parentId]?.trim()) return;
 
     setSubmitting(true);
     try {
@@ -122,10 +123,15 @@ export default function PostDetailPage() {
         user.uid,
         userName,
         userPhoto,
-        replyText,
+        replyTexts[parentId],
         parentId
       );
-      setReplyText('');
+      // Clear reply text for this specific comment
+      setReplyTexts(prev => {
+        const newTexts = { ...prev };
+        delete newTexts[parentId];
+        return newTexts;
+      });
       setReplyingTo(null);
       await loadComments();
     } catch (error) {
@@ -189,16 +195,18 @@ export default function PostDetailPage() {
     }
   };
 
-  const renderComment = (comment: Comment, depth: number = 0, replyToId: string | null = null) => {
-    const isReplying = replyingTo === comment.id;
+  const renderComment = (comment: Comment, depth: number = 0) => {
+    const commentId = comment.id!;
+    const isReplying = replyingTo === commentId;
     const maxDepth = 8; // Limit nesting depth
+    const replyText = replyTexts[commentId] || '';
     
     return (
       <div 
-        key={comment.id} 
-        className={`${depth > 0 ? 'ml-8 mt-2' : 'border-b border-gray-200 last:border-0'} pb-3`}
+        key={commentId} 
+        className={`${depth > 0 ? 'ml-6 border-l-2 border-gray-200 pl-4 mt-3' : ''} py-3`}
       >
-        <div className="flex gap-2">
+        <div className="flex gap-3">
           {comment.authorPhotoUrl ? (
             <img
               src={comment.authorPhotoUrl}
@@ -216,50 +224,64 @@ export default function PostDetailPage() {
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <Link
                 href={`/community/user/${comment.authorId}`}
-                className="text-xs font-medium text-gray-900 hover:text-green-600 transition-colors"
+                className="text-xs font-semibold text-gray-900 hover:underline"
               >
                 u/{comment.authorName}
               </Link>
               <span className="text-xs text-gray-400">•</span>
               <span className="text-xs text-gray-500">{formatDate(comment.createdAt)}</span>
             </div>
-            <p className="text-gray-700 text-sm whitespace-pre-line mb-2 leading-relaxed">{comment.content}</p>
+            <div className="text-gray-900 text-sm whitespace-pre-wrap mb-2 leading-relaxed">
+              {comment.content}
+            </div>
             
             {user && depth < maxDepth && (
               <button
                 onClick={() => {
-                  setReplyingTo(isReplying ? null : comment.id || null);
-                  if (!isReplying) {
-                    setReplyText('');
+                  if (isReplying) {
+                    setReplyingTo(null);
+                    setReplyTexts(prev => {
+                      const newTexts = { ...prev };
+                      delete newTexts[commentId];
+                      return newTexts;
+                    });
+                  } else {
+                    setReplyingTo(commentId);
+                    setReplyTexts(prev => ({ ...prev, [commentId]: '' }));
                   }
                 }}
-                className="text-xs text-gray-500 hover:text-green-600 font-medium transition-colors"
+                className="text-xs text-gray-500 hover:text-green-600 font-medium transition-colors mr-3"
               >
                 {isReplying ? 'Cancel' : 'Reply'}
               </button>
             )}
             
             {isReplying && (
-              <div className="mt-3 mb-3">
+              <div className="mt-3 mb-2">
                 <textarea
                   value={replyText}
-                  onChange={(e) => setReplyText(e.target.value)}
+                  onChange={(e) => setReplyTexts(prev => ({ ...prev, [commentId]: e.target.value }))}
                   placeholder={`Reply to u/${comment.authorName}...`}
                   className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500 mb-2 !text-black placeholder:text-gray-400 resize-none text-sm"
-                  rows={2}
+                  rows={3}
+                  autoFocus
                 />
                 <div className="flex gap-2">
                   <button
-                    onClick={() => handleSubmitReply(comment.id!)}
+                    onClick={() => handleSubmitReply(commentId)}
                     disabled={submitting || !replyText.trim()}
                     className="px-3 py-1.5 bg-green-600 text-white rounded-full text-xs font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
                   >
-                    Reply
+                    {submitting ? 'Posting...' : 'Reply'}
                   </button>
                   <button
                     onClick={() => {
                       setReplyingTo(null);
-                      setReplyText('');
+                      setReplyTexts(prev => {
+                        const newTexts = { ...prev };
+                        delete newTexts[commentId];
+                        return newTexts;
+                      });
                     }}
                     className="px-3 py-1.5 border border-gray-300 rounded-full text-xs font-medium hover:bg-gray-50 transition-colors"
                   >
@@ -272,7 +294,7 @@ export default function PostDetailPage() {
             {/* Render nested replies */}
             {comment.replies && comment.replies.length > 0 && (
               <div className="mt-3">
-                {comment.replies.map(reply => renderComment(reply, depth + 1, comment.id || null))}
+                {comment.replies.map(reply => renderComment(reply, depth + 1))}
               </div>
             )}
           </div>
@@ -463,11 +485,13 @@ export default function PostDetailPage() {
             {comments.length === 0 ? (
               <p className="text-sm text-gray-500 text-center py-8 px-4">No comments yet. Be the first to comment!</p>
             ) : (
-              comments.map((comment) => (
-                <div key={comment.id} className="p-4">
-                  {renderComment(comment)}
-                </div>
-              ))
+              <div className="divide-y divide-gray-200">
+                {comments.map((comment) => (
+                  <div key={comment.id} className="px-4">
+                    {renderComment(comment)}
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </div>
