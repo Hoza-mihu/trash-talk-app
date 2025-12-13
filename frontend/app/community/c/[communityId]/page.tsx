@@ -1544,27 +1544,6 @@ export default function CommunityPage() {
                 </div>
               )}
 
-              {/* Community Badges (non-user specific) */}
-              {community.postCount > 0 && (
-                <div className="pt-4 border-t border-gray-200">
-                  <h4 className="text-xs font-semibold text-gray-900 mb-2 uppercase">Community Badges</h4>
-                  <div className="space-y-2">
-                    {community.postCount >= 10 && (
-                      <div className="flex items-center gap-2 text-xs text-gray-600">
-                        <Trophy className="w-4 h-4 text-yellow-500" />
-                        <span>Active Community</span>
-                      </div>
-                    )}
-                    {community.memberCount >= 10 && (
-                      <div className="flex items-center gap-2 text-xs text-gray-600">
-                        <Users className="w-4 h-4 text-green-500" />
-                        <span>Growing Community</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
               {community.tags && community.tags.length > 0 && (
                 <div className="pt-4 border-t border-gray-200">
                   <h4 className="text-xs font-semibold text-gray-900 mb-2">Tags</h4>
