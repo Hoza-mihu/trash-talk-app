@@ -75,11 +75,11 @@
       ]
     },
     {
-      "collectionGroup": "comments",
+      "collectionGroup": "community_posts",
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "postId",
+          "fieldPath": "communityId",
           "order": "ASCENDING"
         },
         {
@@ -94,10 +94,6 @@
       "fields": [
         {
           "fieldPath": "postId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
           "order": "ASCENDING"
         },
         {
