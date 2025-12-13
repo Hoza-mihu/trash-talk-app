@@ -1355,9 +1355,17 @@ export default function CommunityPage() {
                   <span className="text-gray-500">Created</span>
                   <span className="font-medium text-gray-900 ml-auto">
                     {community.createdAt && (() => {
-                      const date = community.createdAt instanceof Date 
-                        ? community.createdAt 
-                        : (community.createdAt as any).toDate?.() || new Date(community.createdAt);
+                      let date: Date;
+                      if (community.createdAt instanceof Date) {
+                        date = community.createdAt;
+                      } else if (community.createdAt && typeof (community.createdAt as any).toDate === 'function') {
+                        // Firestore Timestamp
+                        date = (community.createdAt as any).toDate();
+                      } else if (typeof community.createdAt === 'string' || typeof community.createdAt === 'number') {
+                        date = new Date(community.createdAt);
+                      } else {
+                        date = new Date();
+                      }
                       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
                     })()}
                   </span>
