@@ -98,6 +98,14 @@ class WastePredictor:
             'color': '#EC4899',
             'icon': '👕'
         },
+        7: {
+            'name': 'Other',
+            'type': 'Uncertain',
+            'tip': 'The confidence level for this classification is low. For better recycling guidance and tips, please visit the community section where you can find more accurate information and advice from other users.',
+            'co2': 0.0,
+            'color': '#6B7280',
+            'icon': '❓'
+        },
     }
     
     def __init__(self, model_path: Optional[str] = None, provider: Optional[str] = None):
@@ -216,6 +224,10 @@ class WastePredictor:
                 predictions = self.model.predict(processed_image, verbose=0)
                 category_id = int(np.argmax(predictions[0]))
                 confidence = float(predictions[0][category_id] * 100)
+                
+                # If confidence is less than 45%, classify as "Other"
+                if confidence < 45.0:
+                    category_id = 7  # "Other" category index
                 
                 # Get category information
                 category_info = self.WASTE_CATEGORIES[category_id]
