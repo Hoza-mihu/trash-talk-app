@@ -489,13 +489,19 @@ export default function PostDetailPage() {
               <p className="text-sm text-gray-500 text-center py-8 px-4">No comments yet. Be the first to comment!</p>
             ) : (
               <div>
-                {comments.map((comment, index) => (
-                  <div key={comment.id || `comment-${index}`} className={index > 0 ? 'border-t border-gray-200' : ''}>
-                    <div className="px-4 py-2">
-                      {renderComment(comment)}
+                {comments.map((comment, index) => {
+                  if (!comment || !comment.id) {
+                    console.warn('Invalid comment at index', index, comment);
+                    return null;
+                  }
+                  return (
+                    <div key={comment.id} className={index > 0 ? 'border-t border-gray-200' : ''}>
+                      <div className="px-4 py-2">
+                        {renderComment(comment)}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
