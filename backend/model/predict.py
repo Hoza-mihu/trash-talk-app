@@ -248,7 +248,7 @@ class WastePredictor:
                 print(f"⚠️  Error with custom model, falling back: {e}")
         
         # Priority 3: Demo mode (random prediction)
-        category_id = np.random.randint(0, len(self.WASTE_CATEGORIES))
+        category_id = np.random.randint(0, len(self.WASTE_CATEGORIES) - 1)  # Exclude "Other" from demo
         confidence = float(np.random.uniform(85, 99))
         
         # Get category information
