@@ -858,7 +858,108 @@ export default function CommunityPage() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
 
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 px-4 py-4">
+          {/* Left Sidebar */}
+          <aside className="hidden lg:block lg:col-span-2 space-y-4">
+            <div className="bg-white rounded-lg border border-gray-200 p-4 sticky top-20 space-y-4">
+              <div>
+                <Link href="/" className="flex items-center gap-2 mb-4 text-gray-700 hover:text-green-600 transition-colors">
+                  <Leaf className="w-5 h-5" />
+                  <span className="font-semibold">Eco-Eco</span>
+                </Link>
+                <nav className="space-y-1">
+                  <Link href="/" className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+                    <Home className="w-4 h-4" />
+                    Home
+                  </Link>
+                  <Link href="/community" className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+                    <TrendingUp className="w-4 h-4" />
+                    Popular
+                  </Link>
+                  <Link href="/community" className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-100 transition-colors">
+                    <Sparkles className="w-4 h-4" />
+                    All
+                  </Link>
+                </nav>
+              </div>
+
+              {user && (
+                <>
+                  <div className="pt-4 border-t border-gray-200">
+                    <Link
+                      href="/community/create-community"
+                      className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors w-full"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Start a community
+                    </Link>
+                  </div>
+
+                  {userCommunities.length > 0 && (
+                    <div className="pt-4 border-t border-gray-200">
+                      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2 px-2">Your Communities</h4>
+                      <div className="space-y-1 max-h-64 overflow-y-auto">
+                        {userCommunities.slice(0, 10).map((comm) => (
+                          <Link
+                            key={comm.id}
+                            href={`/community/c/${comm.id}`}
+                            className="flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                          >
+                            {comm.iconUrl || comm.imageUrl ? (
+                              <img
+                                src={comm.iconUrl || comm.imageUrl}
+                                alt={comm.name}
+                                className="w-5 h-5 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-5 h-5 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                                {comm.name.charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                            <span className="truncate">r/{comm.name}</span>
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {popularCommunities.length > 0 && (
+                    <div className="pt-4 border-t border-gray-200">
+                      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2 px-2">Popular Communities</h4>
+                      <div className="space-y-1 max-h-64 overflow-y-auto">
+                        {popularCommunities.filter(c => c.id !== communityId).slice(0, 5).map((comm) => (
+                          <Link
+                            key={comm.id}
+                            href={`/community/c/${comm.id}`}
+                            className="flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                          >
+                            {comm.iconUrl || comm.imageUrl ? (
+                              <img
+                                src={comm.iconUrl || comm.imageUrl}
+                                alt={comm.name}
+                                className="w-5 h-5 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-5 h-5 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                                {comm.name.charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                            <span className="truncate">r/{comm.name}</span>
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </aside>
+
+          {/* Main Content */}
+          <main className="lg:col-span-7 space-y-4">
             {/* Community Highlights */}
             {(latestPosts.length > 0 || topPosts.length > 0) && (
               <div className="bg-white rounded-lg border border-gray-200 p-4">
