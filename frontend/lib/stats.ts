@@ -5,6 +5,7 @@ export const CATEGORY_KEYS = [
   'Paper',
   'Plastic',
   'Textiles',
+  'E-Waste',
   'Other'
 ] as const;
 
@@ -30,6 +31,7 @@ export const CATEGORY_COLORS: Record<WasteCategoryKey, string> = {
   Paper: '#10B981',
   Plastic: '#3B82F6',
   Textiles: '#EC4899',
+  'E-Waste': '#F97316',
   Other: '#6B7280'
 };
 
@@ -45,6 +47,7 @@ export const createDefaultCategoryStats = (): Record<WasteCategoryKey, CategoryM
   Paper: createCategoryMetric(),
   Plastic: createCategoryMetric(),
   Textiles: createCategoryMetric(),
+  'E-Waste': createCategoryMetric(),
   Other: createCategoryMetric()
 });
 
@@ -68,6 +71,7 @@ export const HISTORICAL_STATS: UserStats = {
     Paper: { count: 160, co2: 48 },
     Plastic: { count: 190, co2: 95 },
     Textiles: { count: 80, co2: 56 },
+    'E-Waste': { count: 0, co2: 0 },
     Other: { count: 40, co2: 18 }
   }
 };

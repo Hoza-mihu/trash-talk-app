@@ -221,17 +221,19 @@ export default function DashboardPage() {
     co2: Number(globalStats.categories[key].co2.toFixed(2))
   }));
 
+  // Include E-Waste even if count is 0, filter out others with 0 count
   const wasteDistributionData = CATEGORY_KEYS.map((key) => ({
     name: key,
     value: globalStats.categories[key].count,
     color: CATEGORY_COLORS[key]
-  })).filter((entry) => entry.value > 0);
+  })).filter((entry) => entry.name === 'E-Waste' || entry.value > 0);
 
   const hasCo2Data = co2ChartData.some((entry) => entry.co2 > 0);
   const hasDistributionData = wasteDistributionData.length > 0;
 
+  // Always show E-Waste in legend, filter out Other only if it has no data
   const visibleLegendKeys = CATEGORY_KEYS.filter(
-    (key) => key !== 'Other' || globalStats.categories.Other.count > 0
+    (key) => key === 'E-Waste' || key !== 'Other' || globalStats.categories.Other.count > 0
   );
 
   return (
