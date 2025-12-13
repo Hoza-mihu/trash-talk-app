@@ -33,6 +33,7 @@ import {
   calculateUserAchievements,
   getAchievementDefinition,
   calculateWeeklyCommunityStats,
+  ACHIEVEMENT_DEFINITIONS,
   Community,
   CommunityPost,
   Notification,

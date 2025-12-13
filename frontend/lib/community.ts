@@ -2086,7 +2086,7 @@ async function getAllUsersCommunityStats(
 /**
  * Achievement definitions
  */
-const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
+export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
   {
     type: 'top_25_poster',
     name: 'Top 25% Poster',
