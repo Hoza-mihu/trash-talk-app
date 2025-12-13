@@ -8,6 +8,9 @@ import { useAuth } from '@/context/AuthContext';
 import {
   getCommunityById,
   getPostsByCommunity,
+  getHotPostsByCommunity,
+  getTopPostsByCommunity,
+  getBestPostsByCommunity,
   subscribeToCommunityPosts,
   joinCommunity,
   leaveCommunity,
@@ -96,20 +99,16 @@ export default function CommunityPage() {
           setUnreadCount(notifs.filter(n => !n.read).length);
         });
         
-        // Subscribe to real-time posts updates
-        const unsubscribePosts = subscribeToCommunityPosts(communityId, (fetchedPosts) => {
-          // Sort posts based on selected option
-          let sortedPosts = [...fetchedPosts];
-          switch (sortOption) {
-            case 'hot':
-              sortedPosts.sort((a, b) => {
-                const scoreA = (a.upvotes - a.downvotes) || 0;
-                const scoreB = (b.upvotes - b.downvotes) || 0;
-                return scoreB - scoreA;
-              });
-              break;
-            case 'new':
-              sortedPosts.sort((a, b) => {
+        // Subscribe to real-time posts updates with proper sorting
+        const unsubscribePosts = subscribeToCommunityPosts(
+          communityId, 
+          (fetchedPosts) => {
+            setPosts(fetchedPosts);
+            setLoading(false);
+            
+            // Update highlights (latest and top posts)
+            const latest = [...fetchedPosts]
+              .sort((a, b) => {
                 const getTime = (date: any): number => {
                   if (!date) return 0;
                   if (date.toMillis && typeof date.toMillis === 'function') {
@@ -127,57 +126,19 @@ export default function CommunityPage() {
                 const aTime = getTime(a.createdAt);
                 const bTime = getTime(b.createdAt);
                 return bTime - aTime;
-              });
-              break;
-            case 'top':
-              sortedPosts.sort((a, b) => {
-                const scoreA = (a.upvotes - a.downvotes) || 0;
-                const scoreB = (b.upvotes - b.downvotes) || 0;
-                return scoreB - scoreA;
-              });
-              break;
-            case 'best':
-            default:
-              sortedPosts.sort((a, b) => {
-                const scoreA = (a.upvotes - a.downvotes) || 0;
-                const scoreB = (b.upvotes - b.downvotes) || 0;
-                return scoreB - scoreA;
-              });
-              break;
-          }
-          setPosts(sortedPosts);
-          setLoading(false);
-          
-          // Update highlights
-          const latest = [...fetchedPosts]
-            .sort((a, b) => {
-              const getTime = (date: any): number => {
-                if (!date) return 0;
-                if (date.toMillis && typeof date.toMillis === 'function') {
-                  return date.toMillis();
-                }
-                if (date instanceof Date) {
-                  return date.getTime();
-                }
-                try {
-                  return new Date(date).getTime();
-                } catch {
-                  return 0;
-                }
-              };
-              const aTime = getTime(a.createdAt);
-              const bTime = getTime(b.createdAt);
-              return bTime - aTime;
-            })
-            .slice(0, 3);
-          setLatestPosts(latest);
-          
-          const top = [...fetchedPosts]
-            .sort((a, b) => (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes))
-            .slice(0, 3);
-          setTopPosts(top);
-          setHighlights(top);
-        });
+              })
+              .slice(0, 3);
+            setLatestPosts(latest);
+            
+            const top = [...fetchedPosts]
+              .sort((a, b) => (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes))
+              .slice(0, 3);
+            setTopPosts(top);
+            setHighlights(top);
+          },
+          50,
+          sortOption
+        );
         
         return () => {
           unsubscribeNotifications();
@@ -355,59 +316,56 @@ export default function CommunityPage() {
   const loadPosts = async () => {
     setLoading(true);
     try {
-      const fetched = await getPostsByCommunity(communityId, 50);
-      // Sort posts based on selected option
-      let sortedPosts = [...fetched];
+      let fetched: CommunityPost[] = [];
+      
+      // Use appropriate function based on sort option
       switch (sortOption) {
         case 'hot':
-          // Sort by upvotes - downvotes (score) in last 24 hours
-          sortedPosts.sort((a, b) => {
-            const scoreA = (a.upvotes - a.downvotes) || 0;
-            const scoreB = (b.upvotes - b.downvotes) || 0;
-            return scoreB - scoreA;
-          });
-          break;
-        case 'new':
-          // Sort by createdAt (most recent first)
-          sortedPosts.sort((a, b) => {
-            const getTime = (date: any): number => {
-              if (!date) return 0;
-              if (date.toMillis && typeof date.toMillis === 'function') {
-                return date.toMillis();
-              }
-              if (date instanceof Date) {
-                return date.getTime();
-              }
-              try {
-                return new Date(date).getTime();
-              } catch {
-                return 0;
-              }
-            };
-            const aTime = getTime(a.createdAt);
-            const bTime = getTime(b.createdAt);
-            return bTime - aTime;
-          });
+          fetched = await getHotPostsByCommunity(communityId, 50);
           break;
         case 'top':
-          // Sort by highest score (upvotes - downvotes)
-          sortedPosts.sort((a, b) => {
-            const scoreA = (a.upvotes - a.downvotes) || 0;
-            const scoreB = (b.upvotes - b.downvotes) || 0;
-            return scoreB - scoreA;
-          });
+          fetched = await getTopPostsByCommunity(communityId, 50);
           break;
         case 'best':
+          fetched = await getBestPostsByCommunity(communityId, 50);
+          break;
+        case 'new':
         default:
-          // Sort by score (upvotes - downvotes) as default
-          sortedPosts.sort((a, b) => {
-            const scoreA = (a.upvotes - a.downvotes) || 0;
-            const scoreB = (b.upvotes - b.downvotes) || 0;
-            return scoreB - scoreA;
-          });
+          fetched = await getPostsByCommunity(communityId, 50);
           break;
       }
-      setPosts(sortedPosts);
+      
+      setPosts(fetched);
+      
+      // Update highlights (latest and top posts)
+      const latest = [...fetched]
+        .sort((a, b) => {
+          const getTime = (date: any): number => {
+            if (!date) return 0;
+            if (date.toMillis && typeof date.toMillis === 'function') {
+              return date.toMillis();
+            }
+            if (date instanceof Date) {
+              return date.getTime();
+            }
+            try {
+              return new Date(date).getTime();
+            } catch {
+              return 0;
+            }
+          };
+          const aTime = getTime(a.createdAt);
+          const bTime = getTime(b.createdAt);
+          return bTime - aTime;
+        })
+        .slice(0, 3);
+      setLatestPosts(latest);
+      
+      const top = [...fetched]
+        .sort((a, b) => (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes))
+        .slice(0, 3);
+      setTopPosts(top);
+      setHighlights(top);
     } catch (error) {
       console.error('Error loading posts:', error);
     } finally {

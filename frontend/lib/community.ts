@@ -1430,7 +1430,7 @@ export async function deletePost(postId: string, userId: string): Promise<void> 
   }
 }
 
-// Get posts by community
+// Get posts by community (sorted by creation date - for "New")
 export async function getPostsByCommunity(
   communityId: string,
   limitCount: number = 50
@@ -1454,28 +1454,186 @@ export async function getPostsByCommunity(
   }
 }
 
-// Subscribe to real-time updates for community posts
-export function subscribeToCommunityPosts(
+// Get hot posts by community (sorted by hotScore)
+export async function getHotPostsByCommunity(
   communityId: string,
-  callback: (posts: CommunityPost[]) => void,
   limitCount: number = 50
-): Unsubscribe {
+): Promise<CommunityPost[]> {
   try {
     const q = query(
       collection(db, 'community_posts'),
       where('communityId', '==', communityId),
+      orderBy('hotScore', 'desc'),
       orderBy('createdAt', 'desc'),
       limit(limitCount)
     );
 
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as CommunityPost));
+  } catch (error) {
+    console.error('Error fetching hot community posts:', error);
+    // Fallback to regular query if hotScore index doesn't exist
+    return getPostsByCommunity(communityId, limitCount);
+  }
+}
+
+// Get top posts by community (sorted by score: upvotes - downvotes)
+export async function getTopPostsByCommunity(
+  communityId: string,
+  limitCount: number = 50
+): Promise<CommunityPost[]> {
+  try {
+    const q = query(
+      collection(db, 'community_posts'),
+      where('communityId', '==', communityId),
+      orderBy('upvotes', 'desc'),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
+    );
+
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as CommunityPost));
+  } catch (error) {
+    console.error('Error fetching top community posts:', error);
+    // Fallback to regular query if upvotes index doesn't exist
+    return getPostsByCommunity(communityId, limitCount);
+  }
+}
+
+/**
+ * Calculate Reddit's "Best" confidence score
+ * Uses Wilson score confidence interval for a Bernoulli parameter
+ * Formula: (p + z²/2n ± z√((p(1-p) + z²/4n)/n)) / (1 + z²/n)
+ * Where p = upvotes / (upvotes + downvotes), z = 1.96 (95% confidence)
+ */
+function calculateBestScore(upvotes: number, downvotes: number): number {
+  const n = upvotes + downvotes;
+  if (n === 0) return 0;
+  
+  const z = 1.96; // 95% confidence
+  const p = upvotes / n;
+  
+  const denominator = 1 + (z * z) / n;
+  const numerator = p + (z * z) / (2 * n);
+  const sqrtPart = z * Math.sqrt((p * (1 - p) + z * z / (4 * n)) / n);
+  
+  // Lower bound of confidence interval
+  return (numerator - sqrtPart) / denominator;
+}
+
+// Get best posts by community (sorted by Reddit's confidence score)
+export async function getBestPostsByCommunity(
+  communityId: string,
+  limitCount: number = 50
+): Promise<CommunityPost[]> {
+  try {
+    // Get all posts and sort by confidence score
+    const q = query(
+      collection(db, 'community_posts'),
+      where('communityId', '==', communityId),
+      limit(limitCount * 2) // Get more to sort properly
+    );
+
+    const querySnapshot = await getDocs(q);
+    const posts = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as CommunityPost));
+    
+    // Sort by confidence score (Reddit's "Best" algorithm)
+    posts.sort((a, b) => {
+      const scoreA = calculateBestScore(a.upvotes || 0, a.downvotes || 0);
+      const scoreB = calculateBestScore(b.upvotes || 0, b.downvotes || 0);
+      return scoreB - scoreA;
+    });
+    
+    return posts.slice(0, limitCount);
+  } catch (error) {
+    console.error('Error fetching best community posts:', error);
+    return getPostsByCommunity(communityId, limitCount);
+  }
+}
+
+// Subscribe to real-time updates for community posts
+export function subscribeToCommunityPosts(
+  communityId: string,
+  callback: (posts: CommunityPost[]) => void,
+  limitCount: number = 50,
+  sortBy: 'new' | 'hot' | 'top' | 'best' = 'new'
+): Unsubscribe {
+  try {
+    let q;
+    
+    switch (sortBy) {
+      case 'hot':
+        q = query(
+          collection(db, 'community_posts'),
+          where('communityId', '==', communityId),
+          orderBy('hotScore', 'desc'),
+          orderBy('createdAt', 'desc'),
+          limit(limitCount)
+        );
+        break;
+      case 'top':
+        q = query(
+          collection(db, 'community_posts'),
+          where('communityId', '==', communityId),
+          orderBy('upvotes', 'desc'),
+          orderBy('createdAt', 'desc'),
+          limit(limitCount)
+        );
+        break;
+      case 'new':
+      default:
+        q = query(
+          collection(db, 'community_posts'),
+          where('communityId', '==', communityId),
+          orderBy('createdAt', 'desc'),
+          limit(limitCount)
+        );
+        break;
+    }
+
     return onSnapshot(q, (snapshot) => {
-      const posts = snapshot.docs.map(doc => ({
+      let posts = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       } as CommunityPost));
+      
+      // For "best" sorting, we need to sort by confidence score client-side
+      if (sortBy === 'best') {
+        posts.sort((a, b) => {
+          const scoreA = calculateBestScore(a.upvotes || 0, a.downvotes || 0);
+          const scoreB = calculateBestScore(b.upvotes || 0, b.downvotes || 0);
+          return scoreB - scoreA;
+        });
+      }
+      
       callback(posts);
     }, (error) => {
       console.error('Error in community posts subscription:', error);
+      // Fallback to basic query if index doesn't exist
+      if (sortBy !== 'new') {
+        const fallbackQ = query(
+          collection(db, 'community_posts'),
+          where('communityId', '==', communityId),
+          orderBy('createdAt', 'desc'),
+          limit(limitCount)
+        );
+        return onSnapshot(fallbackQ, (snapshot) => {
+          const posts = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          } as CommunityPost));
+          callback(posts);
+        });
+      }
       callback([]);
     });
   } catch (error) {
