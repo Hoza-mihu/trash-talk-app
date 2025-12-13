@@ -1359,71 +1359,103 @@ export async function deletePost(postId: string, userId: string): Promise<void> 
       throw new Error('Only the author or community creator can delete this post');
     }
 
+    // Delete the post document FIRST so it disappears from UI immediately via real-time subscription
+    // This provides instant feedback to users (Reddit-like behavior)
+    await deleteDoc(postRef);
+    console.log(`Post ${postId} deleted from Firestore - UI will update immediately`);
+
+    // Delete associated data in parallel (non-blocking for UI)
+    const cleanupPromises: Promise<void>[] = [];
+
     // Delete post image from storage if exists
     if (postData.imageUrl) {
-      try {
-          const urlParts = postData.imageUrl.split('/');
-          const pathIndex = urlParts.findIndex((part: string) => part === 'o');
-        if (pathIndex !== -1 && pathIndex < urlParts.length - 1) {
-          const encodedPath = urlParts[pathIndex + 1].split('?')[0];
-          const decodedPath = decodeURIComponent(encodedPath);
-          const imageRef = ref(storage, decodedPath);
-          await deleteObject(imageRef);
-        }
-      } catch (storageError) {
-        console.warn('Failed to delete post image from storage:', storageError);
-        // Continue with post deletion even if image deletion fails
-      }
+      cleanupPromises.push(
+        (async () => {
+          try {
+            const urlParts = postData.imageUrl!.split('/');
+            const pathIndex = urlParts.findIndex((part: string) => part === 'o');
+            if (pathIndex !== -1 && pathIndex < urlParts.length - 1) {
+              const encodedPath = urlParts[pathIndex + 1].split('?')[0];
+              const decodedPath = decodeURIComponent(encodedPath);
+              const imageRef = ref(storage, decodedPath);
+              await deleteObject(imageRef);
+              console.log(`Deleted post image from storage`);
+            }
+          } catch (storageError) {
+            console.warn('Failed to delete post image from storage:', storageError);
+          }
+        })()
+      );
     }
 
     // Delete all comments for this post
-    const commentsQuery = query(
-      collection(db, 'comments'),
-      where('postId', '==', postId)
+    cleanupPromises.push(
+      (async () => {
+        try {
+          const commentsQuery = query(
+            collection(db, 'comments'),
+            where('postId', '==', postId)
+          );
+          const commentsSnapshot = await getDocs(commentsQuery);
+          if (commentsSnapshot.docs.length > 0) {
+            const deleteCommentPromises = commentsSnapshot.docs.map(commentDoc =>
+              deleteDoc(doc(db, 'comments', commentDoc.id))
+            );
+            await Promise.all(deleteCommentPromises);
+            console.log(`Deleted ${commentsSnapshot.docs.length} comments for post ${postId}`);
+          }
+        } catch (error) {
+          console.warn('Failed to delete comments:', error);
+        }
+      })()
     );
-    const commentsSnapshot = await getDocs(commentsQuery);
-    if (commentsSnapshot.docs.length > 0) {
-      const deleteCommentPromises = commentsSnapshot.docs.map(commentDoc =>
-        deleteDoc(doc(db, 'comments', commentDoc.id))
-      );
-      await Promise.all(deleteCommentPromises);
-      console.log(`Deleted ${commentsSnapshot.docs.length} comments for post ${postId}`);
-    }
 
     // Delete all votes for this post
-    const votesQuery = query(
-      collection(db, 'votes'),
-      where('postId', '==', postId)
+    cleanupPromises.push(
+      (async () => {
+        try {
+          const votesQuery = query(
+            collection(db, 'votes'),
+            where('postId', '==', postId)
+          );
+          const votesSnapshot = await getDocs(votesQuery);
+          if (votesSnapshot.docs.length > 0) {
+            const deleteVotePromises = votesSnapshot.docs.map(voteDoc =>
+              deleteDoc(doc(db, 'votes', voteDoc.id))
+            );
+            await Promise.all(deleteVotePromises);
+            console.log(`Deleted ${votesSnapshot.docs.length} votes for post ${postId}`);
+          }
+        } catch (error) {
+          console.warn('Failed to delete votes:', error);
+        }
+      })()
     );
-    const votesSnapshot = await getDocs(votesQuery);
-    if (votesSnapshot.docs.length > 0) {
-      const deleteVotePromises = votesSnapshot.docs.map(voteDoc =>
-        deleteDoc(doc(db, 'votes', voteDoc.id))
-      );
-      await Promise.all(deleteVotePromises);
-      console.log(`Deleted ${votesSnapshot.docs.length} votes for post ${postId}`);
-    }
 
-    // Decrement post count in community if post belongs to a community
+    // Decrement post count in community
     if (postData.communityId) {
-      const communityRef = doc(db, 'communities', postData.communityId);
-      await updateDoc(communityRef, {
-        postCount: increment(-1),
-        updatedAt: serverTimestamp()
-      });
-      console.log(`Decremented post count for community ${postData.communityId}`);
+      cleanupPromises.push(
+        (async () => {
+          try {
+            const communityRef = doc(db, 'communities', postData.communityId!);
+            await updateDoc(communityRef, {
+              postCount: increment(-1),
+              updatedAt: serverTimestamp()
+            });
+            console.log(`Decremented post count for community ${postData.communityId}`);
+          } catch (communityError) {
+            console.warn('Failed to decrement community post count:', communityError);
+          }
+        })()
+      );
     }
 
-    // Finally delete the post document itself - THIS IS THE CRITICAL STEP
-    await deleteDoc(postRef);
+    // Run cleanup in parallel (don't wait, let it complete in background)
+    Promise.all(cleanupPromises).catch(error => {
+      console.error('Error during post cleanup:', error);
+    });
     
-    // Verify deletion
-    const verifySnap = await getDoc(postRef);
-    if (verifySnap.exists()) {
-      throw new Error('Post deletion failed - post still exists in database');
-    }
-    
-    console.log(`Post ${postId} successfully deleted from Firestore`);
+    console.log(`Post ${postId} successfully deleted - cleanup running in background`);
   } catch (error) {
     console.error('Error deleting post:', error);
     throw error;
