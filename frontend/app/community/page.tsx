@@ -73,9 +73,11 @@ export default function CommunityPage() {
       let fetchedPosts: CommunityPost[] = [];
       
       if (sortBy === 'popular') {
-        fetchedPosts = await getPopularPosts(50);
+        const result = await getPopularPosts(50);
+        fetchedPosts = result.posts;
       } else {
-        fetchedPosts = await getAllPosts(50);
+        const result = await getAllPosts(50);
+        fetchedPosts = result.posts;
       }
       
       // Filter by category if selected

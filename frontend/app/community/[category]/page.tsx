@@ -22,8 +22,8 @@ export default function CategoryTipsPage() {
   const loadTips = async () => {
     setLoading(true);
     try {
-      const fetchedTips = await getTipsByCategory(category, 20);
-      setTips(fetchedTips);
+      const { posts } = await getTipsByCategory(category, 20);
+      setTips(posts);
     } catch (error) {
       console.error('Error loading tips:', error);
     } finally {

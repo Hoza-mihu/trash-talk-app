@@ -31,12 +31,12 @@ export default function UserProfilePage() {
   const loadUserData = async () => {
     setLoading(true);
     try {
-      const [userPosts, userComments, profile] = await Promise.all([
+      const [userPostsResult, userComments, profile] = await Promise.all([
         getPostsByUser(userId, 50),
         getCommentsByUser(userId, 50),
         getUserProfile(userId)
       ]);
-      setPosts(userPosts);
+      setPosts(userPostsResult.posts);
       setComments(userComments);
       setUserProfile(profile);
     } catch (error) {
