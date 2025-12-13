@@ -754,22 +754,28 @@ export default function CommunityPage() {
                             Create Post
                           </Link>
                         )}
-                        {isMember && user && (
-                          <div className="relative">
-                            <button
-                              onClick={() => {
-                                setShowNotificationSettings(!showNotificationSettings);
-                                setShowNotifications(false);
-                              }}
-                              className="p-2 rounded-lg hover:bg-gray-100 transition-colors relative"
-                            >
-                              <Bell className="w-5 h-5 text-gray-600" />
-                              {unreadCount > 0 && (
-                                <span className="absolute top-0 right-0 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                                  {unreadCount > 9 ? '9+' : unreadCount}
-                                </span>
-                              )}
-                            </button>
+                         {isMember && user && (
+                           <div className="relative">
+                             <button
+                               onClick={() => {
+                                 setShowNotificationSettings(!showNotificationSettings);
+                                 setShowNotifications(false);
+                               }}
+                               className="p-2 rounded-lg hover:bg-gray-100 transition-colors relative"
+                             >
+                               {notificationPreference === 'mute' ? (
+                                 <VolumeX className="w-5 h-5 text-red-600" />
+                               ) : notificationPreference === 'off' ? (
+                                 <Bell className="w-5 h-5 text-gray-400" />
+                               ) : (
+                                 <Bell className="w-5 h-5 text-gray-600" />
+                               )}
+                               {unreadCount > 0 && notificationPreference !== 'mute' && (
+                                 <span className="absolute top-0 right-0 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                                   {unreadCount > 9 ? '9+' : unreadCount}
+                                 </span>
+                               )}
+                             </button>
                             {showNotificationSettings && (
                               <>
                                 <div
