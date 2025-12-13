@@ -2356,16 +2356,23 @@ export function getAchievementDefinition(type: AchievementType): AchievementDefi
 }
 
 /**
- * Calculate weekly stats for a community
+ * Calculate weekly stats for a community (last 7 days)
+ * Weekly visitors: Unique users who posted, commented, or voted in the last 7 days
+ * Weekly contributions: Posts created in the last 7 days + Comments created in the last 7 days (regardless of post age)
  */
 export async function calculateWeeklyCommunityStats(communityId: string): Promise<{
   weeklyVisitors: number;
   weeklyContributions: number;
 }> {
   try {
-    const oneWeekAgo = Timestamp.fromDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
+    const now = new Date();
+    const oneWeekAgo = Timestamp.fromDate(new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000));
 
-    // Get unique visitors (users who viewed posts or interacted)
+    const visitorSet = new Set<string>();
+    let postCount = 0;
+    let commentCount = 0;
+
+    // Get posts created in the last week for this community
     const postsQuery = query(
       collection(db, 'community_posts'),
       where('communityId', '==', communityId),
@@ -2373,44 +2380,69 @@ export async function calculateWeeklyCommunityStats(communityId: string): Promis
     );
     const postsSnapshot = await getDocs(postsQuery);
     
-    const visitorSet = new Set<string>();
-    const postIds: string[] = [];
-
+    postCount = postsSnapshot.size;
+    const weeklyPostIds: string[] = [];
     postsSnapshot.forEach((doc) => {
       const data = doc.data();
       visitorSet.add(data.authorId);
-      postIds.push(doc.id);
+      weeklyPostIds.push(doc.id);
     });
 
-    // Get comments from last week
-    let commentCount = 0;
-    for (const postId of postIds) {
-      const commentsQuery = query(
-        collection(db, 'comments'),
-        where('postId', '==', postId),
-        where('createdAt', '>=', oneWeekAgo)
-      );
-      const commentsSnapshot = await getDocs(commentsQuery);
-      commentCount += commentsSnapshot.size;
-      commentsSnapshot.forEach((doc) => {
-        visitorSet.add(doc.data().authorId);
-      });
+    // Get ALL post IDs in this community (to find comments on any post from this week)
+    const allPostsQuery = query(
+      collection(db, 'community_posts'),
+      where('communityId', '==', communityId)
+    );
+    const allPostsSnapshot = await getDocs(allPostsQuery);
+    const allPostIds = allPostsSnapshot.docs.map(doc => doc.id);
+
+    // Get ALL comments created in the last week for posts in this community
+    // (regardless of when the post was created - this is the key difference)
+    if (allPostIds.length > 0) {
+      // Firestore 'in' queries are limited to 10 items, so we batch if needed
+      const batchSize = 10;
+      for (let i = 0; i < allPostIds.length; i += batchSize) {
+        const postIdsBatch = allPostIds.slice(i, i + batchSize);
+        const commentsQuery = query(
+          collection(db, 'comments'),
+          where('postId', 'in', postIdsBatch),
+          where('createdAt', '>=', oneWeekAgo)
+        );
+        const commentsSnapshot = await getDocs(commentsQuery);
+        commentCount += commentsSnapshot.size;
+        commentsSnapshot.forEach((doc) => {
+          const data = doc.data();
+          visitorSet.add(data.authorId);
+        });
+      }
     }
 
-    // Get votes from last week
-    for (const postId of postIds) {
-      const votesQuery = query(
-        collection(db, 'votes'),
-        where('postId', '==', postId)
-      );
-      const votesSnapshot = await getDocs(votesQuery);
-      votesSnapshot.forEach((doc) => {
-        visitorSet.add(doc.data().userId);
-      });
+    // Get votes from last week (users who voted on posts in this community)
+    if (allPostIds.length > 0) {
+      const batchSize = 10;
+      for (let i = 0; i < allPostIds.length; i += batchSize) {
+        const postIdsBatch = allPostIds.slice(i, i + batchSize);
+        const votesQuery = query(
+          collection(db, 'votes'),
+          where('postId', 'in', postIdsBatch),
+          where('createdAt', '>=', oneWeekAgo)
+        );
+        try {
+          const votesSnapshot = await getDocs(votesQuery);
+          votesSnapshot.forEach((doc) => {
+            const data = doc.data();
+            visitorSet.add(data.userId);
+          });
+        } catch (error) {
+          // If createdAt field doesn't exist on votes or query fails, skip
+          console.warn('Could not filter votes by createdAt:', error);
+        }
+      }
     }
 
     const weeklyVisitors = visitorSet.size;
-    const weeklyContributions = postsSnapshot.size + commentCount;
+    // Weekly contributions = posts created this week + comments created this week
+    const weeklyContributions = postCount + commentCount;
 
     // Update community stats
     const communityRef = doc(db, 'communities', communityId);

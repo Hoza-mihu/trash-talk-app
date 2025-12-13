@@ -324,18 +324,17 @@ export default function CommunityPage() {
       
       setCommunity(fetched);
       
-      // Calculate and update weekly stats if not already set
-      if (fetched.weeklyVisitors === undefined || fetched.weeklyContributions === undefined) {
-        try {
-          await calculateWeeklyCommunityStats(communityId);
-          // Reload to get updated stats
-          const updated = await getCommunityById(communityId);
-          if (updated) {
-            setCommunity(updated);
-          }
-        } catch (error) {
-          console.error('Error calculating weekly stats:', error);
+      // Calculate and update weekly stats if not set or if we should refresh (every time page loads to ensure accuracy)
+      // Weekly stats should reflect the current week's activity
+      try {
+        await calculateWeeklyCommunityStats(communityId);
+        // Reload to get updated stats
+        const updated = await getCommunityById(communityId);
+        if (updated) {
+          setCommunity(updated);
         }
+      } catch (error) {
+        console.error('Error calculating weekly stats:', error);
       }
     } catch (error) {
       console.error('Error loading community:', error);
