@@ -1445,30 +1445,102 @@ export default function CommunityPage() {
               )}
 
               {/* User Achievements */}
-              {user && isMember && userAchievements.length > 0 && (
+              {user && isMember && (
                 <div className="pt-4 border-t border-gray-200">
-                  <h4 className="text-xs font-semibold text-gray-900 mb-3 uppercase">Community Achievements</h4>
-                  <div className="grid grid-cols-2 gap-2 mb-2">
-                    {userAchievements.slice(0, 4).map((achievement) => {
-                      const def = getAchievementDefinition(achievement.achievementType);
-                      if (!def) return null;
-                      return (
-                        <div
-                          key={achievement.id}
-                          className="flex flex-col items-center p-2 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
-                          title={def.description}
-                        >
-                          <span className="text-2xl mb-1">{def.icon}</span>
-                          <span className="text-[10px] font-medium text-gray-700 text-center leading-tight">
-                            {def.name}
-                          </span>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-xs font-semibold text-gray-900 uppercase">Community Achievements</h4>
+                    <button
+                      onClick={() => setShowAllAchievements(!showAllAchievements)}
+                      className="text-xs text-green-600 hover:text-green-700 font-medium"
+                    >
+                      {showAllAchievements ? 'Show Less' : 'View All'}
+                    </button>
+                  </div>
+                  {!showAllAchievements ? (
+                    // Show only unlocked achievements (first 4)
+                    userAchievements.length > 0 ? (
+                      <>
+                        <div className="grid grid-cols-2 gap-2 mb-2">
+                          {userAchievements.slice(0, 4).map((achievement) => {
+                            const def = getAchievementDefinition(achievement.achievementType);
+                            if (!def) return null;
+                            return (
+                              <div
+                                key={achievement.id}
+                                className="flex flex-col items-center p-2 rounded-lg bg-gradient-to-br from-green-50 to-green-100 border border-green-200 hover:border-green-300 transition-colors"
+                                title={def.description}
+                              >
+                                <span className="text-2xl mb-1">{def.icon}</span>
+                                <span className="text-[10px] font-medium text-gray-700 text-center leading-tight">
+                                  {def.name}
+                                </span>
+                              </div>
+                            );
+                          })}
                         </div>
-                      );
-                    })}
-                  </div>
-                  <div className="text-xs text-gray-500 text-center">
-                    {userAchievements.length} unlocked
-                  </div>
+                        <div className="text-xs text-gray-500 text-center">
+                          {userAchievements.length} of {ACHIEVEMENT_DEFINITIONS.length} unlocked
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-xs text-gray-500 text-center py-2">
+                        No achievements unlocked yet. Click "View All" to see available badges.
+                      </div>
+                    )
+                  ) : (
+                    // Show all achievements (locked and unlocked)
+                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                      {ACHIEVEMENT_DEFINITIONS.map((def) => {
+                        const unlockedAchievement = userAchievements.find(
+                          a => a.achievementType === def.type
+                        );
+                        const isUnlocked = !!unlockedAchievement;
+                        
+                        return (
+                          <div
+                            key={def.type}
+                            className={`flex items-center gap-3 p-2 rounded-lg border transition-colors ${
+                              isUnlocked
+                                ? 'bg-gradient-to-r from-green-50 to-green-100 border-green-200'
+                                : 'bg-gray-50 border-gray-200 opacity-60'
+                            }`}
+                          >
+                            <div className={`text-2xl flex-shrink-0 ${isUnlocked ? '' : 'grayscale opacity-50'}`}>
+                              {def.icon}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className={`text-xs font-semibold ${isUnlocked ? 'text-gray-900' : 'text-gray-500'}`}>
+                                  {def.name}
+                                </span>
+                                {isUnlocked && (
+                                  <span className="text-[10px] bg-green-500 text-white px-1.5 py-0.5 rounded-full font-medium flex-shrink-0">
+                                    Unlocked
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-gray-600 mt-0.5">{def.description}</p>
+                              {isUnlocked && unlockedAchievement && (
+                                <p className="text-[10px] text-gray-500 mt-1">
+                                  Unlocked {(() => {
+                                    let date: Date;
+                                    if (unlockedAchievement.unlockedAt instanceof Date) {
+                                      date = unlockedAchievement.unlockedAt;
+                                    } else if (unlockedAchievement.unlockedAt && typeof (unlockedAchievement.unlockedAt as any).toDate === 'function') {
+                                      date = (unlockedAchievement.unlockedAt as any).toDate();
+                                    } else {
+                                      date = new Date();
+                                    }
+                                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                                  })()}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
 
