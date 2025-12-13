@@ -49,6 +49,16 @@ class Config:
     GOOGLE_CLOUD_API_KEY = os.getenv('GOOGLE_CLOUD_API_KEY', '')
     FIREBASE_ADMIN_SDK = os.getenv('FIREBASE_ADMIN_SDK', '')
     
+    # ML Provider Configuration
+    # Options: 'huggingface', 'openai', 'google', 'tensorflow_hub', or None for custom model
+    ML_PROVIDER = os.getenv('ML_PROVIDER', None)  # None = use custom model if available
+    
+    # Provider-specific API Keys
+    HUGGINGFACE_API_KEY = os.getenv('HUGGINGFACE_API_KEY', '')
+    HUGGINGFACE_MODEL_ID = os.getenv('HUGGINGFACE_MODEL_ID', 'microsoft/resnet-50')
+    OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
+    TFHUB_MODEL_URL = os.getenv('TFHUB_MODEL_URL', '')
+    
     @staticmethod
     def init_app(app):
         """Initialize application"""

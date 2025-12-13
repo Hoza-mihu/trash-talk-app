@@ -7,6 +7,10 @@ tensorflow==2.15.0
 keras==2.15.0
 numpy==1.24.3
 pillow==10.1.0
+tensorflow-hub==0.16.1
+
+# HTTP Requests for API providers
+requests==2.31.0
 
 # Image Processing
 # opencv-python-headless removed - not used, using PIL instead

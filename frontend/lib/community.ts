@@ -666,6 +666,7 @@ export async function addComment(
     const commentRef = await addDoc(collection(db, 'comments'), {
       postId,
       postAuthorId: postAuthorId || null, // Store post author ID for permission checks
+      communityId: postData.communityId || null, // Store communityId for efficient querying
       content,
       authorId: userId,
       authorName: userName,
@@ -2387,20 +2388,57 @@ export async function calculateWeeklyCommunityStats(communityId: string): Promis
     let commentCount = 0;
 
     // Get posts created in the last week for this community
-    const postsQuery = query(
-      collection(db, 'community_posts'),
-      where('communityId', '==', communityId),
-      where('createdAt', '>=', oneWeekAgo)
-    );
-    const postsSnapshot = await getDocs(postsQuery);
-    
-    postCount = postsSnapshot.size;
-    const weeklyPostIds: string[] = [];
-    postsSnapshot.forEach((doc) => {
-      const data = doc.data();
-      visitorSet.add(data.authorId);
-      weeklyPostIds.push(doc.id);
-    });
+    try {
+      const postsQuery = query(
+        collection(db, 'community_posts'),
+        where('communityId', '==', communityId),
+        where('createdAt', '>=', oneWeekAgo)
+      );
+      const postsSnapshot = await getDocs(postsQuery);
+      
+      postCount = postsSnapshot.size;
+      const weeklyPostIds: string[] = [];
+      postsSnapshot.forEach((doc) => {
+        const data = doc.data();
+        visitorSet.add(data.authorId);
+        weeklyPostIds.push(doc.id);
+      });
+      console.log(`[Weekly Stats] Found ${postCount} posts from last week`);
+    } catch (postsError) {
+      console.error('[Weekly Stats] Error querying posts:', postsError);
+      // If query fails, try without date filter as fallback
+      try {
+        const allPostsQuery = query(
+          collection(db, 'community_posts'),
+          where('communityId', '==', communityId)
+        );
+        const allPostsSnapshot = await getDocs(allPostsQuery);
+        // Filter client-side
+        const now = Date.now();
+        const oneWeekAgoMs = now - (7 * 24 * 60 * 60 * 1000);
+        allPostsSnapshot.forEach((doc) => {
+          const data = doc.data();
+          const createdAt = data.createdAt;
+          let postDate: Date | null = null;
+          
+          if (createdAt?.toDate) {
+            postDate = createdAt.toDate();
+          } else if (createdAt instanceof Date) {
+            postDate = createdAt;
+          } else if (createdAt) {
+            postDate = new Date(createdAt);
+          }
+          
+          if (postDate && postDate.getTime() >= oneWeekAgoMs) {
+            postCount++;
+            visitorSet.add(data.authorId);
+          }
+        });
+        console.log(`[Weekly Stats] Fallback: Found ${postCount} posts from last week (client-side filter)`);
+      } catch (fallbackError) {
+        console.error('[Weekly Stats] Fallback query also failed:', fallbackError);
+      }
+    }
 
     // Get ALL post IDs in this community (to find comments on any post from this week)
     const allPostsQuery = query(
@@ -2411,23 +2449,45 @@ export async function calculateWeeklyCommunityStats(communityId: string): Promis
     const allPostIds = allPostsSnapshot.docs.map(doc => doc.id);
 
     // Get ALL comments created in the last week for posts in this community
-    // (regardless of when the post was created - this is the key difference)
-    if (allPostIds.length > 0) {
-      // Firestore 'in' queries are limited to 10 items, so we batch if needed
-      const batchSize = 10;
-      for (let i = 0; i < allPostIds.length; i += batchSize) {
-        const postIdsBatch = allPostIds.slice(i, i + batchSize);
-        const commentsQuery = query(
-          collection(db, 'comments'),
-          where('postId', 'in', postIdsBatch),
-          where('createdAt', '>=', oneWeekAgo)
-        );
-        const commentsSnapshot = await getDocs(commentsQuery);
-        commentCount += commentsSnapshot.size;
-        commentsSnapshot.forEach((doc) => {
-          const data = doc.data();
-          visitorSet.add(data.authorId);
-        });
+    // Try to query by communityId first (more efficient), fallback to postId batches
+    try {
+      const commentsByCommunityQuery = query(
+        collection(db, 'comments'),
+        where('communityId', '==', communityId),
+        where('createdAt', '>=', oneWeekAgo)
+      );
+      const commentsByCommunitySnapshot = await getDocs(commentsByCommunityQuery);
+      commentCount += commentsByCommunitySnapshot.size;
+      commentsByCommunitySnapshot.forEach((doc) => {
+        const data = doc.data();
+        visitorSet.add(data.authorId);
+      });
+      console.log(`[Weekly Stats] Found ${commentsByCommunitySnapshot.size} comments via communityId query`);
+    } catch (communityIdQueryError) {
+      // If communityId query fails (e.g., no index or old comments don't have communityId),
+      // fallback to querying by postId batches
+      console.warn('[Weekly Stats] Querying comments by communityId failed, falling back to postId batches:', communityIdQueryError);
+      if (allPostIds.length > 0) {
+        // Firestore 'in' queries are limited to 10 items, so we batch if needed
+        const batchSize = 10;
+        for (let i = 0; i < allPostIds.length; i += batchSize) {
+          const postIdsBatch = allPostIds.slice(i, i + batchSize);
+          try {
+            const commentsQuery = query(
+              collection(db, 'comments'),
+              where('postId', 'in', postIdsBatch),
+              where('createdAt', '>=', oneWeekAgo)
+            );
+            const commentsSnapshot = await getDocs(commentsQuery);
+            commentCount += commentsSnapshot.size;
+            commentsSnapshot.forEach((doc) => {
+              const data = doc.data();
+              visitorSet.add(data.authorId);
+            });
+          } catch (postIdQueryError) {
+            console.warn(`[Weekly Stats] Error querying comments for post batch ${i}-${i + batchSize}:`, postIdQueryError);
+          }
+        }
       }
     }
 
@@ -2458,27 +2518,39 @@ export async function calculateWeeklyCommunityStats(communityId: string): Promis
     // Weekly contributions = posts created this week + comments created this week
     const weeklyContributions = postCount + commentCount;
 
-    console.log(`Weekly stats for ${communityId}:`, {
+    console.log(`[Weekly Stats] Community ${communityId}:`, {
       weeklyVisitors,
       weeklyContributions,
       postCount,
       commentCount,
-      visitorSetSize: visitorSet.size
+      visitorSetSize: visitorSet.size,
+      oneWeekAgo: oneWeekAgo.toDate().toISOString(),
+      now: new Date().toISOString()
     });
 
     // Update community stats
-    const communityRef = doc(db, 'communities', communityId);
-    await updateDoc(communityRef, {
-      weeklyVisitors,
-      weeklyContributions,
-      updatedAt: serverTimestamp()
-    });
-
-    console.log('Updated community document with weekly stats');
+    try {
+      const communityRef = doc(db, 'communities', communityId);
+      await updateDoc(communityRef, {
+        weeklyVisitors,
+        weeklyContributions,
+        updatedAt: serverTimestamp()
+      });
+      console.log(`[Weekly Stats] Successfully updated community ${communityId} with stats`);
+    } catch (updateError) {
+      console.error(`[Weekly Stats] Error updating community document:`, updateError);
+      throw updateError; // Re-throw to be caught by outer catch
+    }
 
     return { weeklyVisitors, weeklyContributions };
   } catch (error) {
-    console.error('Error calculating weekly stats:', error);
+    console.error('[Weekly Stats] Error calculating weekly stats:', error);
+    // Log detailed error info
+    if (error instanceof Error) {
+      console.error('[Weekly Stats] Error message:', error.message);
+      console.error('[Weekly Stats] Error stack:', error.stack);
+    }
+    // Return zeros on error to avoid breaking the UI
     return { weeklyVisitors: 0, weeklyContributions: 0 };
   }
 }

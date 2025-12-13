@@ -327,17 +327,31 @@ export default function CommunityPage() {
       // Calculate and update weekly stats (always refresh to ensure accuracy)
       // Weekly stats should reflect the current week's activity
       try {
-        console.log('Calculating weekly stats for community:', communityId);
+        console.log('[Community Page] Calculating weekly stats for community:', communityId);
         const stats = await calculateWeeklyCommunityStats(communityId);
-        console.log('Weekly stats calculated:', stats);
-        // Reload to get updated stats
-        const updated = await getCommunityById(communityId);
-        if (updated) {
-          console.log('Updated community with stats:', updated.weeklyVisitors, updated.weeklyContributions);
-          setCommunity(updated);
-        }
+        console.log('[Community Page] Weekly stats calculated:', stats);
+        
+        // Reload to get updated stats - wait a bit for Firestore to update
+        setTimeout(async () => {
+          try {
+            const updated = await getCommunityById(communityId);
+            if (updated) {
+              console.log('[Community Page] Updated community with stats:', {
+                weeklyVisitors: updated.weeklyVisitors,
+                weeklyContributions: updated.weeklyContributions
+              });
+              setCommunity(updated);
+            }
+          } catch (reloadError) {
+            console.error('[Community Page] Error reloading community:', reloadError);
+          }
+        }, 500); // Small delay to ensure Firestore has updated
       } catch (error) {
-        console.error('Error calculating weekly stats:', error);
+        console.error('[Community Page] Error calculating weekly stats:', error);
+        // Still try to load existing stats from community document
+        if (fetched.weeklyVisitors !== undefined || fetched.weeklyContributions !== undefined) {
+          console.log('[Community Page] Using existing stats from community document');
+        }
       }
     } catch (error) {
       console.error('Error loading community:', error);

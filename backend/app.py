@@ -40,7 +40,10 @@ CORS(app, resources={
 })
 
 # Initialize model predictor
-predictor = WastePredictor(model_path=app.config['MODEL_PATH'])
+predictor = WastePredictor(
+    model_path=app.config['MODEL_PATH'],
+    provider=app.config.get('ML_PROVIDER')
+)
 
 # Create necessary directories
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)

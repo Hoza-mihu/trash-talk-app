@@ -41,12 +41,19 @@ pip install -r requirements.txt
 python app.py           # http://localhost:5000
 ```
 
-Ensure `backend/model/model.h5` exists. You can copy the latest trained model with:
-```bash
-python scripts/copy_model.py
-```
+**Model Options:**
+- **Option A (Recommended)**: Use alternative ML providers (no training needed!)
+  - See `backend/ALTERNATIVE_ML_PROVIDERS.md` for setup
+  - Set `ML_PROVIDER=huggingface` in your `.env` file (free tier available)
+  
+- **Option B**: Use custom trained model
+  - Ensure `backend/model/model.h5` exists
+  - Copy the latest trained model with: `python scripts/copy_model.py`
 
-### 3. Model Training (optional)
+### 3. Model Training (optional - not required!)
+**You don't need to train your own model!** Use alternative ML providers instead (see `backend/ALTERNATIVE_ML_PROVIDERS.md`).
+
+If you want to train a custom model:
 ```bash
 cd model-training
 python -m venv venv
