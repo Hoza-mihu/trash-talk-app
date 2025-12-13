@@ -103,12 +103,12 @@ export default function ProfilePage() {
       setLoadingAnalyses(true);
       
       try {
-        const [posts, communities, analyses] = await Promise.all([
+        const [postsResult, communities, analyses] = await Promise.all([
           getPostsByUser(user.uid, 10),
           getCommunitiesByCreator(user.uid, 10),
           getUserAnalyses(user.uid)
         ]);
-        setUserPosts(posts);
+        setUserPosts(postsResult.posts);
         setUserCommunities(communities);
         setUserAnalyses(analyses);
       } catch (error) {

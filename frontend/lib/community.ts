@@ -731,23 +731,44 @@ export async function searchPosts(searchTerm: string, limitCount: number = 20): 
 }
 
 // Get posts by user
-export async function getPostsByUser(userId: string, limitCount: number = 20): Promise<CommunityPost[]> {
+export async function getPostsByUser(
+  userId: string,
+  limitCount: number = 20,
+  lastDoc?: QueryDocumentSnapshot<DocumentData>
+): Promise<{ posts: CommunityPost[]; lastDoc?: QueryDocumentSnapshot<DocumentData> }> {
   try {
-    const q = query(
+    let q = query(
       collection(db, 'community_posts'),
       where('authorId', '==', userId),
       orderBy('createdAt', 'desc'),
       limit(limitCount)
     );
     
+    // Apply pagination if lastDoc is provided
+    if (lastDoc) {
+      q = query(
+        collection(db, 'community_posts'),
+        where('authorId', '==', userId),
+        orderBy('createdAt', 'desc'),
+        startAfter(lastDoc),
+        limit(limitCount)
+      );
+    }
+    
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
+    const posts = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     } as CommunityPost));
+    
+    const lastDocument = querySnapshot.docs.length > 0 
+      ? querySnapshot.docs[querySnapshot.docs.length - 1] 
+      : undefined;
+    
+    return { posts, lastDoc: lastDocument };
   } catch (error) {
     console.error('Error fetching user posts:', error);
-    return [];
+    return { posts: [] };
   }
 }
 
@@ -1668,6 +1689,7 @@ export function subscribeToNotifications(
     callback(notifications);
   });
 }
+
 
 
 
