@@ -474,7 +474,26 @@ export default function CommunityPage() {
     e.preventDefault();
     e.stopPropagation();
     
-    if (!user) return;
+    if (!user) {
+      alert('You must be logged in to delete posts.');
+      return;
+    }
+    
+    // Find the post to check permissions
+    const postToDelete = posts.find(p => p.id === postId);
+    if (!postToDelete) {
+      alert('Post not found.');
+      return;
+    }
+    
+    // Check permissions before showing confirm
+    const isAuthor = postToDelete.authorId === user.uid;
+    const isCommunityCreator = community && community.creatorId === user.uid;
+    
+    if (!isAuthor && !isCommunityCreator) {
+      alert('You do not have permission to delete this post. Only the post author or community creator can delete it.');
+      return;
+    }
     
     if (!confirm('Are you sure you want to delete this post? This will also delete all comments. This action cannot be undone.')) {
       return;
@@ -482,14 +501,15 @@ export default function CommunityPage() {
 
     setDeletingPostId(postId);
     try {
-      console.log(`Deleting post ${postId}...`);
+      console.log(`Deleting post ${postId}...`, 'User:', user.uid, 'Is Author:', isAuthor, 'Is Community Creator:', isCommunityCreator);
       await deletePost(postId, user.uid);
       console.log(`Post ${postId} deleted successfully`);
       // Posts will automatically update via real-time subscription
       // The subscription will detect the deletion and remove it from the list
     } catch (error: any) {
       console.error('Error deleting post:', error);
-      alert(error.message || 'Failed to delete post. Please try again.');
+      const errorMessage = error.message || 'Failed to delete post. Please check console for details.';
+      alert(errorMessage);
     } finally {
       setDeletingPostId(null);
     }

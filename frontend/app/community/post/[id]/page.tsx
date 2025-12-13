@@ -152,7 +152,19 @@ export default function PostDetailPage() {
   };
 
   const handleDeletePost = async () => {
-    if (!user || !post) return;
+    if (!user || !post) {
+      alert('You must be logged in to delete posts.');
+      return;
+    }
+    
+    // Double check permissions before showing confirm
+    const isAuthor = post.authorId === user.uid;
+    const isCommunityCreator = community && community.creatorId === user.uid;
+    
+    if (!isAuthor && !isCommunityCreator) {
+      alert('You do not have permission to delete this post. Only the post author or community creator can delete it.');
+      return;
+    }
     
     if (!confirm('Are you sure you want to delete this post? This will also delete all comments. This action cannot be undone.')) {
       return;
@@ -160,6 +172,7 @@ export default function PostDetailPage() {
 
     setDeleting(true);
     try {
+      console.log('Attempting to delete post:', postId, 'User:', user.uid, 'Is Author:', isAuthor, 'Is Community Creator:', isCommunityCreator);
       await deletePost(postId, user.uid);
       console.log('Post deletion completed, redirecting...');
       // Redirect to community page or back to community if post was in a community
@@ -170,7 +183,8 @@ export default function PostDetailPage() {
       }
     } catch (error: any) {
       console.error('Error deleting post:', error);
-      alert(error.message || 'Failed to delete post. Please try again.');
+      const errorMessage = error.message || 'Failed to delete post. Please try again.';
+      alert(errorMessage);
       setDeleting(false);
     }
   };
