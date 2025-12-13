@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Leaf, Users, Plus, MessageSquare, TrendingUp, Filter, Trash2, Bell, MoreHorizontal, Clock, Flame, Trophy, LayoutGrid, List, Edit2, Image as ImageIcon, X, Star, Bookmark, VolumeX, Rocket, Check, Sparkles, Home } from 'lucide-react';
+import { ArrowLeft, Leaf, Users, Plus, MessageSquare, TrendingUp, Filter, Trash2, Bell, MoreHorizontal, Clock, Flame, Trophy, LayoutGrid, List, Edit2, Image as ImageIcon, X, Star, Bookmark, VolumeX, Rocket, Check, Sparkles, Home, Calendar, Globe } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import {
   getCommunityById,
@@ -29,9 +29,15 @@ import {
   subscribeToNotifications,
   getUserCommunities,
   getPopularCommunities,
+  getUserCommunityAchievements,
+  calculateUserAchievements,
+  getAchievementDefinition,
+  calculateWeeklyCommunityStats,
   Community,
   CommunityPost,
-  Notification
+  Notification,
+  CommunityAchievement,
+  AchievementType
 } from '@/lib/community';
 import { CATEGORY_COLORS } from '@/lib/stats';
 
@@ -72,6 +78,8 @@ export default function CommunityPage() {
   const [notificationPreference, setNotificationPreference] = useState<'all' | 'popular' | 'off' | 'mute'>('all');
   const [userCommunities, setUserCommunities] = useState<Community[]>([]);
   const [popularCommunities, setPopularCommunities] = useState<Community[]>([]);
+  const [userAchievements, setUserAchievements] = useState<CommunityAchievement[]>([]);
+  const [loadingAchievements, setLoadingAchievements] = useState(false);
 
   useEffect(() => {
     if (communityId) {
@@ -308,8 +316,36 @@ export default function CommunityPage() {
     try {
       const fetched = await getCommunityById(communityId);
       setCommunity(fetched);
+      
+      // Calculate and update weekly stats if not already set
+      if (!fetched.weeklyVisitors || !fetched.weeklyContributions) {
+        try {
+          await calculateWeeklyCommunityStats(communityId);
+          // Reload to get updated stats
+          const updated = await getCommunityById(communityId);
+          setCommunity(updated);
+        } catch (error) {
+          console.error('Error calculating weekly stats:', error);
+        }
+      }
     } catch (error) {
       console.error('Error loading community:', error);
+    }
+  };
+
+  const loadUserAchievements = async () => {
+    if (!user || !communityId) return;
+    setLoadingAchievements(true);
+    try {
+      // Calculate achievements first (this will unlock new ones)
+      await calculateUserAchievements(user.uid, communityId);
+      // Then get all achievements
+      const achievements = await getUserCommunityAchievements(user.uid, communityId);
+      setUserAchievements(achievements);
+    } catch (error) {
+      console.error('Error loading achievements:', error);
+    } finally {
+      setLoadingAchievements(false);
     }
   };
 
@@ -1307,20 +1343,56 @@ export default function CommunityPage() {
               </div>
               
               <div className="space-y-2 text-xs">
-                <div className="flex items-center justify-between py-1">
+                <div className="flex items-center gap-2 py-1">
+                  <Calendar className="w-3.5 h-3.5 text-gray-400" />
                   <span className="text-gray-500">Created</span>
-                  <span className="font-medium text-gray-900">
-                    {community.createdAt && formatDate(community.createdAt)}
+                  <span className="font-medium text-gray-900 ml-auto">
+                    {community.createdAt && (() => {
+                      const date = community.createdAt instanceof Date 
+                        ? community.createdAt 
+                        : (community.createdAt as any).toDate?.() || new Date(community.createdAt);
+                      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                    })()}
                   </span>
                 </div>
+                <div className="flex items-center gap-2 py-1">
+                  <Globe className="w-3.5 h-3.5 text-gray-400" />
+                  <span className="text-gray-500">Status</span>
+                  <span className="font-medium text-gray-900 ml-auto capitalize">
+                    {community.communityType || 'Public'}
+                  </span>
+                </div>
+              </div>
+              
+              <div className="space-y-2 text-xs pt-2 border-t border-gray-200">
                 <div className="flex items-center justify-between py-1">
                   <span className="text-gray-500">Members</span>
-                  <span className="font-semibold text-gray-900">{community.memberCount}</span>
+                  <span className="font-semibold text-gray-900">{community.memberCount.toLocaleString()}</span>
                 </div>
                 <div className="flex items-center justify-between py-1">
                   <span className="text-gray-500">Posts</span>
-                  <span className="font-semibold text-gray-900">{community.postCount}</span>
+                  <span className="font-semibold text-gray-900">{community.postCount.toLocaleString()}</span>
                 </div>
+                {community.weeklyVisitors !== undefined && (
+                  <div className="flex items-center justify-between py-1">
+                    <span className="text-gray-500">Weekly visitors</span>
+                    <span className="font-semibold text-gray-900">
+                      {community.weeklyVisitors >= 1000 
+                        ? `${(community.weeklyVisitors / 1000).toFixed(1)}K` 
+                        : community.weeklyVisitors.toLocaleString()}
+                    </span>
+                  </div>
+                )}
+                {community.weeklyContributions !== undefined && (
+                  <div className="flex items-center justify-between py-1">
+                    <span className="text-gray-500">Weekly contributions</span>
+                    <span className="font-semibold text-gray-900">
+                      {community.weeklyContributions >= 1000 
+                        ? `${(community.weeklyContributions / 1000).toFixed(1)}K` 
+                        : community.weeklyContributions.toLocaleString()}
+                    </span>
+                  </div>
+                )}
                 {community.category && (
                   <div className="flex items-center justify-between py-1">
                     <span className="text-gray-500">Category</span>
@@ -1332,12 +1404,6 @@ export default function CommunityPage() {
                     </span>
                   </div>
                 )}
-                <div className="flex items-center justify-between py-1">
-                  <span className="text-gray-500">Type</span>
-                  <span className="font-medium text-gray-900 capitalize">
-                    {community.communityType || 'Public'}
-                  </span>
-                </div>
               </div>
 
               {/* User Flair Section */}
@@ -1361,10 +1427,38 @@ export default function CommunityPage() {
                 </div>
               )}
 
-              {/* Community Achievements */}
+              {/* User Achievements */}
+              {user && isMember && userAchievements.length > 0 && (
+                <div className="pt-4 border-t border-gray-200">
+                  <h4 className="text-xs font-semibold text-gray-900 mb-3 uppercase">Community Achievements</h4>
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    {userAchievements.slice(0, 4).map((achievement) => {
+                      const def = getAchievementDefinition(achievement.achievementType);
+                      if (!def) return null;
+                      return (
+                        <div
+                          key={achievement.id}
+                          className="flex flex-col items-center p-2 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
+                          title={def.description}
+                        >
+                          <span className="text-2xl mb-1">{def.icon}</span>
+                          <span className="text-[10px] font-medium text-gray-700 text-center leading-tight">
+                            {def.name}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="text-xs text-gray-500 text-center">
+                    {userAchievements.length} unlocked
+                  </div>
+                </div>
+              )}
+
+              {/* Community Badges (non-user specific) */}
               {community.postCount > 0 && (
                 <div className="pt-4 border-t border-gray-200">
-                  <h4 className="text-xs font-semibold text-gray-900 mb-2 uppercase">Community Achievements</h4>
+                  <h4 className="text-xs font-semibold text-gray-900 mb-2 uppercase">Community Badges</h4>
                   <div className="space-y-2">
                     {community.postCount >= 10 && (
                       <div className="flex items-center gap-2 text-xs text-gray-600">

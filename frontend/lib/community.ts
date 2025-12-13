@@ -96,6 +96,8 @@ export interface Community {
   creatorName: string;
   memberCount: number;
   postCount: number;
+  weeklyVisitors?: number; // Weekly unique visitors
+  weeklyContributions?: number; // Weekly posts + comments
   createdAt: Timestamp | Date;
   updatedAt: Timestamp | Date;
   imageUrl?: string; // Legacy - use bannerUrl and iconUrl instead
@@ -106,6 +108,53 @@ export interface Community {
   communityType?: 'public' | 'restricted' | 'private';
   matureContent?: boolean;
   topics?: string[]; // Selected topics (up to 3)
+}
+
+export interface CommunityAchievement {
+  id: string;
+  userId: string;
+  communityId: string;
+  achievementType: AchievementType;
+  unlockedAt: Timestamp | Date;
+  progress?: number; // Current progress towards achievement (e.g., 75 for 75%)
+  metadata?: Record<string, any>; // Additional data like rank percentage
+}
+
+export type AchievementType = 
+  | 'top_25_poster' 
+  | 'top_10_poster' 
+  | 'top_5_poster' 
+  | 'top_1_poster'
+  | 'top_25_commenter'
+  | 'top_10_commenter'
+  | 'top_5_commenter'
+  | 'top_1_commenter'
+  | 'picasso' // Top contributor (posts + comments)
+  | 'rising_star' // New member who's very active
+  | 'repeat_contributor' // Consistent contributor
+  | 'super_contributor' // High total contributions
+  | 'content_connoisseur' // High-quality content creator
+  | 'elder'; // Long-time member
+
+export interface UserCommunityStats {
+  userId: string;
+  communityId: string;
+  postCount: number;
+  commentCount: number;
+  totalContributions: number; // posts + comments
+  upvotesReceived: number; // Total upvotes on user's posts and comments
+  memberSince: Timestamp | Date;
+  lastActive: Timestamp | Date;
+}
+
+export interface AchievementDefinition {
+  type: AchievementType;
+  name: string;
+  description: string;
+  icon: string; // Emoji or icon identifier
+  color: string; // Color scheme
+  requirement: (stats: UserCommunityStats, allStats: UserCommunityStats[]) => boolean;
+  calculateProgress?: (stats: UserCommunityStats, allStats: UserCommunityStats[]) => number;
 }
 
 export interface CommunityPost {
@@ -228,6 +277,16 @@ export async function createPost(
         console.warn('Failed to send notifications:', notifyError);
         // Don't fail post creation if notifications fail
       }
+
+      // Calculate achievements for the user in this community (async, don't wait)
+      calculateUserAchievements(userId, postData.communityId).catch(error => {
+        console.warn('Failed to calculate achievements:', error);
+      });
+
+      // Update weekly stats (async, don't wait)
+      calculateWeeklyCommunityStats(postData.communityId).catch(error => {
+        console.warn('Failed to update weekly stats:', error);
+      });
     }
     
     console.log('Post created successfully with ID:', docRef.id);
@@ -626,6 +685,22 @@ export async function addComment(
       commentCount: increment(1),
       updatedAt: serverTimestamp()
     });
+    
+    // Get post data to check if it belongs to a community
+    const postData = postSnap.data() as CommunityPost;
+    
+    // Calculate achievements and update stats if post belongs to a community
+    if (postData.communityId) {
+      // Calculate achievements for the user in this community (async, don't wait)
+      calculateUserAchievements(userId, postData.communityId).catch(error => {
+        console.warn('Failed to calculate achievements:', error);
+      });
+
+      // Update weekly stats (async, don't wait)
+      calculateWeeklyCommunityStats(postData.communityId).catch(error => {
+        console.warn('Failed to update weekly stats:', error);
+      });
+    }
     
     return commentRef.id;
   } catch (error) {
@@ -1879,6 +1954,475 @@ export function subscribeToNotifications(
     } as Notification));
     callback(notifications);
   });
+}
+
+// ========== ACHIEVEMENT SYSTEM ==========
+
+/**
+ * Get user statistics for a specific community
+ */
+export async function getUserCommunityStats(
+  userId: string,
+  communityId: string
+): Promise<UserCommunityStats> {
+  try {
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+    // Get user's posts in this community
+    const postsQuery = query(
+      collection(db, 'community_posts'),
+      where('communityId', '==', communityId),
+      where('authorId', '==', userId)
+    );
+    const postsSnapshot = await getDocs(postsQuery);
+    
+    let postCount = 0;
+    let upvotesReceived = 0;
+    let lastActive: Date | null = null;
+
+    postsSnapshot.forEach((doc) => {
+      postCount++;
+      const data = doc.data();
+      upvotesReceived += (data.upvotes || 0);
+      const createdAt = data.createdAt?.toDate?.() || new Date(data.createdAt);
+      if (!lastActive || createdAt > lastActive) {
+        lastActive = createdAt;
+      }
+    });
+
+    // Get user's comments in this community (comments on posts in this community)
+    const postsIds = postsSnapshot.docs.map(doc => doc.id);
+    
+    // Also get comments on all posts in the community
+    const allPostsQuery = query(
+      collection(db, 'community_posts'),
+      where('communityId', '==', communityId)
+    );
+    const allPostsSnapshot = await getDocs(allPostsQuery);
+    const allPostIds = allPostsSnapshot.docs.map(doc => doc.id);
+
+    let commentCount = 0;
+    for (const postId of allPostIds) {
+      const commentsQuery = query(
+        collection(db, 'comments'),
+        where('postId', '==', postId),
+        where('authorId', '==', userId)
+      );
+      const commentsSnapshot = await getDocs(commentsQuery);
+      commentCount += commentsSnapshot.size;
+      
+      commentsSnapshot.forEach((doc) => {
+        const data = doc.data();
+        upvotesReceived += (data.upvotes || 0);
+        const createdAt = data.createdAt?.toDate?.() || new Date(data.createdAt);
+        if (!lastActive || createdAt > lastActive) {
+          lastActive = createdAt;
+        }
+      });
+    }
+
+    // Get membership date
+    const membershipRef = doc(db, 'community_members', `${communityId}_${userId}`);
+    const membershipSnap = await getDoc(membershipRef);
+    const memberSince = membershipSnap.exists() && membershipSnap.data().joinedAt
+      ? membershipSnap.data().joinedAt.toDate()
+      : new Date();
+
+    return {
+      userId,
+      communityId,
+      postCount,
+      commentCount,
+      totalContributions: postCount + commentCount,
+      upvotesReceived,
+      memberSince,
+      lastActive: lastActive || memberSince
+    };
+  } catch (error) {
+    console.error('Error getting user community stats:', error);
+    return {
+      userId,
+      communityId,
+      postCount: 0,
+      commentCount: 0,
+      totalContributions: 0,
+      upvotesReceived: 0,
+      memberSince: new Date(),
+      lastActive: new Date()
+    };
+  }
+}
+
+/**
+ * Get all user statistics for a community (for ranking)
+ */
+async function getAllUsersCommunityStats(
+  communityId: string
+): Promise<UserCommunityStats[]> {
+  try {
+    // Get all members
+    const membersQuery = query(
+      collection(db, 'community_members'),
+      where('communityId', '==', communityId),
+      where('leftAt', '==', null)
+    );
+    const membersSnapshot = await getDocs(membersQuery);
+    
+    const statsPromises = membersSnapshot.docs.map(doc => {
+      const membershipData = doc.data();
+      return getUserCommunityStats(membershipData.userId, communityId);
+    });
+
+    return await Promise.all(statsPromises);
+  } catch (error) {
+    console.error('Error getting all users community stats:', error);
+    return [];
+  }
+}
+
+/**
+ * Achievement definitions
+ */
+const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
+  {
+    type: 'top_25_poster',
+    name: 'Top 25% Poster',
+    description: 'In the top 25% of posters in this community',
+    icon: '👑',
+    color: '#EF4444',
+    requirement: (stats, allStats) => {
+      if (stats.postCount === 0) return false;
+      const sorted = [...allStats].sort((a, b) => b.postCount - a.postCount);
+      const index = sorted.findIndex(s => s.userId === stats.userId);
+      const percentile = (1 - (index + 1) / sorted.length) * 100;
+      return percentile >= 75; // Top 25%
+    }
+  },
+  {
+    type: 'top_10_poster',
+    name: 'Top 10% Poster',
+    description: 'In the top 10% of posters in this community',
+    icon: '👑',
+    color: '#F97316',
+    requirement: (stats, allStats) => {
+      if (stats.postCount === 0) return false;
+      const sorted = [...allStats].sort((a, b) => b.postCount - a.postCount);
+      const index = sorted.findIndex(s => s.userId === stats.userId);
+      const percentile = (1 - (index + 1) / sorted.length) * 100;
+      return percentile >= 90; // Top 10%
+    }
+  },
+  {
+    type: 'top_5_poster',
+    name: 'Top 5% Poster',
+    description: 'In the top 5% of posters in this community',
+    icon: '👑',
+    color: '#F59E0B',
+    requirement: (stats, allStats) => {
+      if (stats.postCount === 0) return false;
+      const sorted = [...allStats].sort((a, b) => b.postCount - a.postCount);
+      const index = sorted.findIndex(s => s.userId === stats.userId);
+      const percentile = (1 - (index + 1) / sorted.length) * 100;
+      return percentile >= 95; // Top 5%
+    }
+  },
+  {
+    type: 'top_1_poster',
+    name: 'Top 1% Poster',
+    description: 'In the top 1% of posters in this community',
+    icon: '👑',
+    color: '#EAB308',
+    requirement: (stats, allStats) => {
+      if (stats.postCount === 0) return false;
+      const sorted = [...allStats].sort((a, b) => b.postCount - a.postCount);
+      const index = sorted.findIndex(s => s.userId === stats.userId);
+      const percentile = (1 - (index + 1) / sorted.length) * 100;
+      return percentile >= 99; // Top 1%
+    }
+  },
+  {
+    type: 'top_25_commenter',
+    name: 'Top 25% Commenter',
+    description: 'In the top 25% of commenters in this community',
+    icon: '💬',
+    color: '#8B5CF6',
+    requirement: (stats, allStats) => {
+      if (stats.commentCount === 0) return false;
+      const sorted = [...allStats].sort((a, b) => b.commentCount - a.commentCount);
+      const index = sorted.findIndex(s => s.userId === stats.userId);
+      const percentile = (1 - (index + 1) / sorted.length) * 100;
+      return percentile >= 75;
+    }
+  },
+  {
+    type: 'top_10_commenter',
+    name: 'Top 10% Commenter',
+    description: 'In the top 10% of commenters in this community',
+    icon: '💬',
+    color: '#A855F7',
+    requirement: (stats, allStats) => {
+      if (stats.commentCount === 0) return false;
+      const sorted = [...allStats].sort((a, b) => b.commentCount - a.commentCount);
+      const index = sorted.findIndex(s => s.userId === stats.userId);
+      const percentile = (1 - (index + 1) / sorted.length) * 100;
+      return percentile >= 90;
+    }
+  },
+  {
+    type: 'top_5_commenter',
+    name: 'Top 5% Commenter',
+    description: 'In the top 5% of commenters in this community',
+    icon: '💬',
+    color: '#C084FC',
+    requirement: (stats, allStats) => {
+      if (stats.commentCount === 0) return false;
+      const sorted = [...allStats].sort((a, b) => b.commentCount - a.commentCount);
+      const index = sorted.findIndex(s => s.userId === stats.userId);
+      const percentile = (1 - (index + 1) / sorted.length) * 100;
+      return percentile >= 95;
+    }
+  },
+  {
+    type: 'top_1_commenter',
+    name: 'Top 1% Commenter',
+    description: 'In the top 1% of commenters in this community',
+    icon: '💬',
+    color: '#DDD6FE',
+    requirement: (stats, allStats) => {
+      if (stats.commentCount === 0) return false;
+      const sorted = [...allStats].sort((a, b) => b.commentCount - a.commentCount);
+      const index = sorted.findIndex(s => s.userId === stats.userId);
+      const percentile = (1 - (index + 1) / sorted.length) * 100;
+      return percentile >= 99;
+    }
+  },
+  {
+    type: 'picasso',
+    name: 'Picasso',
+    description: 'Top contributor (posts + comments combined)',
+    icon: '🎨',
+    color: '#10B981',
+    requirement: (stats, allStats) => {
+      if (stats.totalContributions === 0) return false;
+      const sorted = [...allStats].sort((a, b) => b.totalContributions - a.totalContributions);
+      const index = sorted.findIndex(s => s.userId === stats.userId);
+      return index < 10; // Top 10 contributors
+    }
+  },
+  {
+    type: 'rising_star',
+    name: 'Rising Star',
+    description: 'New member who is very active',
+    icon: '⭐',
+    color: '#FBBF24',
+    requirement: (stats, allStats) => {
+      const memberSince = stats.memberSince instanceof Timestamp 
+        ? stats.memberSince.toDate() 
+        : new Date(stats.memberSince);
+      const daysSinceJoin = (new Date().getTime() - memberSince.getTime()) / (1000 * 60 * 60 * 24);
+      return daysSinceJoin <= 30 && stats.totalContributions >= 10; // Active new member
+    }
+  },
+  {
+    type: 'repeat_contributor',
+    name: 'Repeat Contributor',
+    description: 'Consistent contributor over time',
+    icon: '🔄',
+    color: '#3B82F6',
+    requirement: (stats, allStats) => {
+      const memberSince = stats.memberSince instanceof Timestamp 
+        ? stats.memberSince.toDate() 
+        : new Date(stats.memberSince);
+      const daysSinceJoin = (new Date().getTime() - memberSince.getTime()) / (1000 * 60 * 60 * 24);
+      return daysSinceJoin >= 30 && stats.totalContributions >= 20; // Consistent over time
+    }
+  },
+  {
+    type: 'super_contributor',
+    name: 'Super Contributor',
+    description: 'High total contributions',
+    icon: '🌟',
+    color: '#EC4899',
+    requirement: (stats, allStats) => stats.totalContributions >= 50
+  },
+  {
+    type: 'content_connoisseur',
+    name: 'Content Connoisseur',
+    description: 'High-quality content creator',
+    icon: '📚',
+    color: '#6366F1',
+    requirement: (stats, allStats) => stats.upvotesReceived >= 100
+  },
+  {
+    type: 'elder',
+    name: 'Elder',
+    description: 'Long-time community member',
+    icon: '🧙',
+    color: '#64748B',
+    requirement: (stats, allStats) => {
+      const memberSince = stats.memberSince instanceof Timestamp 
+        ? stats.memberSince.toDate() 
+        : new Date(stats.memberSince);
+      const daysSinceJoin = (new Date().getTime() - memberSince.getTime()) / (1000 * 60 * 60 * 24);
+      return daysSinceJoin >= 180; // 6 months+
+    }
+  }
+];
+
+/**
+ * Calculate and unlock achievements for a user in a community
+ */
+export async function calculateUserAchievements(
+  userId: string,
+  communityId: string
+): Promise<CommunityAchievement[]> {
+  try {
+    const userStats = await getUserCommunityStats(userId, communityId);
+    const allStats = await getAllUsersCommunityStats(communityId);
+
+    const unlockedAchievements: CommunityAchievement[] = [];
+
+    for (const achievement of ACHIEVEMENT_DEFINITIONS) {
+      if (achievement.requirement(userStats, allStats)) {
+        // Check if already unlocked
+        const achievementRef = doc(
+          db, 
+          'community_achievements', 
+          `${communityId}_${userId}_${achievement.type}`
+        );
+        const existingSnap = await getDoc(achievementRef);
+
+        if (!existingSnap.exists()) {
+          // Unlock new achievement
+          const achievementData: CommunityAchievement = {
+            id: `${communityId}_${userId}_${achievement.type}`,
+            userId,
+            communityId,
+            achievementType: achievement.type,
+            unlockedAt: Timestamp.now()
+          };
+
+          await setDoc(achievementRef, {
+            ...achievementData,
+            unlockedAt: serverTimestamp()
+          });
+
+          unlockedAchievements.push(achievementData);
+        }
+      }
+    }
+
+    return unlockedAchievements;
+  } catch (error) {
+    console.error('Error calculating achievements:', error);
+    return [];
+  }
+}
+
+/**
+ * Get user achievements for a community
+ */
+export async function getUserCommunityAchievements(
+  userId: string,
+  communityId: string
+): Promise<CommunityAchievement[]> {
+  try {
+    const q = query(
+      collection(db, 'community_achievements'),
+      where('userId', '==', userId),
+      where('communityId', '==', communityId),
+      orderBy('unlockedAt', 'desc')
+    );
+
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as CommunityAchievement));
+  } catch (error) {
+    console.error('Error getting user achievements:', error);
+    return [];
+  }
+}
+
+/**
+ * Get achievement definition by type
+ */
+export function getAchievementDefinition(type: AchievementType): AchievementDefinition | undefined {
+  return ACHIEVEMENT_DEFINITIONS.find(a => a.type === type);
+}
+
+/**
+ * Calculate weekly stats for a community
+ */
+export async function calculateWeeklyCommunityStats(communityId: string): Promise<{
+  weeklyVisitors: number;
+  weeklyContributions: number;
+}> {
+  try {
+    const oneWeekAgo = Timestamp.fromDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
+
+    // Get unique visitors (users who viewed posts or interacted)
+    const postsQuery = query(
+      collection(db, 'community_posts'),
+      where('communityId', '==', communityId),
+      where('createdAt', '>=', oneWeekAgo)
+    );
+    const postsSnapshot = await getDocs(postsQuery);
+    
+    const visitorSet = new Set<string>();
+    const postIds: string[] = [];
+
+    postsSnapshot.forEach((doc) => {
+      const data = doc.data();
+      visitorSet.add(data.authorId);
+      postIds.push(doc.id);
+    });
+
+    // Get comments from last week
+    let commentCount = 0;
+    for (const postId of postIds) {
+      const commentsQuery = query(
+        collection(db, 'comments'),
+        where('postId', '==', postId),
+        where('createdAt', '>=', oneWeekAgo)
+      );
+      const commentsSnapshot = await getDocs(commentsQuery);
+      commentCount += commentsSnapshot.size;
+      commentsSnapshot.forEach((doc) => {
+        visitorSet.add(doc.data().authorId);
+      });
+    }
+
+    // Get votes from last week
+    for (const postId of postIds) {
+      const votesQuery = query(
+        collection(db, 'votes'),
+        where('postId', '==', postId)
+      );
+      const votesSnapshot = await getDocs(votesQuery);
+      votesSnapshot.forEach((doc) => {
+        visitorSet.add(doc.data().userId);
+      });
+    }
+
+    const weeklyVisitors = visitorSet.size;
+    const weeklyContributions = postsSnapshot.size + commentCount;
+
+    // Update community stats
+    const communityRef = doc(db, 'communities', communityId);
+    await updateDoc(communityRef, {
+      weeklyVisitors,
+      weeklyContributions,
+      updatedAt: serverTimestamp()
+    });
+
+    return { weeklyVisitors, weeklyContributions };
+  } catch (error) {
+    console.error('Error calculating weekly stats:', error);
+    return { weeklyVisitors: 0, weeklyContributions: 0 };
+  }
 }
 
 
