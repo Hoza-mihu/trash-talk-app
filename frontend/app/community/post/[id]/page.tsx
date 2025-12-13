@@ -34,14 +34,6 @@ export default function PostDetailPage() {
       if (user) {
         loadUserVote();
       }
-      
-      // Reload comments when post or user changes
-      const interval = setInterval(() => {
-        loadComments();
-        loadPost(); // Also reload post to update comment count
-      }, 5000); // Refresh every 5 seconds
-      
-      return () => clearInterval(interval);
     }
   }, [postId, user]);
 
@@ -142,6 +134,7 @@ export default function PostDetailPage() {
       });
       setReplyingTo(null);
       await loadComments();
+      await loadPost(); // Reload post to update comment count
     } catch (error) {
       console.error('Error submitting reply:', error);
       alert('Failed to post reply. Please try again.');
