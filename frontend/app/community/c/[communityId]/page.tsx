@@ -81,6 +81,7 @@ export default function CommunityPage() {
   const [popularCommunities, setPopularCommunities] = useState<Community[]>([]);
   const [userAchievements, setUserAchievements] = useState<CommunityAchievement[]>([]);
   const [loadingAchievements, setLoadingAchievements] = useState(false);
+  const [showAllAchievements, setShowAllAchievements] = useState(false);
 
   useEffect(() => {
     if (communityId) {
