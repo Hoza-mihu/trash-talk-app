@@ -189,69 +189,79 @@ export default function PostDetailPage() {
     }
   };
 
-  const renderComment = (comment: Comment, depth: number = 0) => {
+  const renderComment = (comment: Comment, depth: number = 0, replyToId: string | null = null) => {
     const isReplying = replyingTo === comment.id;
+    const maxDepth = 8; // Limit nesting depth
     
     return (
-      <div key={comment.id} className={depth > 0 ? 'ml-8 mt-4 border-l-2 border-gray-200 pl-4' : 'border-b border-gray-200 pb-6 last:border-0'}>
-        <div className="flex gap-4">
+      <div 
+        key={comment.id} 
+        className={`${depth > 0 ? 'ml-8 mt-2' : 'border-b border-gray-200 last:border-0'} pb-3`}
+      >
+        <div className="flex gap-2">
           {comment.authorPhotoUrl ? (
             <img
               src={comment.authorPhotoUrl}
               alt={comment.authorName}
-              className="w-10 h-10 rounded-full"
+              className="w-8 h-8 rounded-full flex-shrink-0"
             />
           ) : (
-            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-              <span className="text-green-600 font-bold">
+            <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+              <span className="text-green-600 font-bold text-xs">
                 {comment.authorName.charAt(0).toUpperCase()}
               </span>
             </div>
           )}
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               <Link
                 href={`/community/user/${comment.authorId}`}
-                className="font-semibold text-gray-900 hover:text-green-600 transition-colors"
+                className="text-xs font-medium text-gray-900 hover:text-green-600 transition-colors"
               >
                 u/{comment.authorName}
               </Link>
-              <span className="text-sm text-gray-500">{formatDate(comment.createdAt)}</span>
+              <span className="text-xs text-gray-400">•</span>
+              <span className="text-xs text-gray-500">{formatDate(comment.createdAt)}</span>
             </div>
-            <p className="text-gray-700 whitespace-pre-line mb-3">{comment.content}</p>
+            <p className="text-gray-700 text-sm whitespace-pre-line mb-2 leading-relaxed">{comment.content}</p>
             
-            {user && (
+            {user && depth < maxDepth && (
               <button
-                onClick={() => setReplyingTo(isReplying ? null : comment.id || null)}
-                className="text-sm text-green-600 hover:text-green-700 font-medium"
+                onClick={() => {
+                  setReplyingTo(isReplying ? null : comment.id || null);
+                  if (!isReplying) {
+                    setReplyText('');
+                  }
+                }}
+                className="text-xs text-gray-500 hover:text-green-600 font-medium transition-colors"
               >
                 {isReplying ? 'Cancel' : 'Reply'}
               </button>
             )}
             
             {isReplying && (
-              <div className="mt-3">
+              <div className="mt-3 mb-3">
                 <textarea
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
-                  placeholder="Write a reply..."
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 mb-2 !text-black placeholder:text-gray-400"
-                  rows={3}
+                  placeholder={`Reply to u/${comment.authorName}...`}
+                  className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500 mb-2 !text-black placeholder:text-gray-400 resize-none text-sm"
+                  rows={2}
                 />
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleSubmitReply(comment.id!)}
                     disabled={submitting || !replyText.trim()}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
+                    className="px-3 py-1.5 bg-green-600 text-white rounded-full text-xs font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
                   >
-                    Post Reply
+                    Reply
                   </button>
                   <button
                     onClick={() => {
                       setReplyingTo(null);
                       setReplyText('');
                     }}
-                    className="px-4 py-2 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                    className="px-3 py-1.5 border border-gray-300 rounded-full text-xs font-medium hover:bg-gray-50 transition-colors"
                   >
                     Cancel
                   </button>
@@ -261,8 +271,8 @@ export default function PostDetailPage() {
             
             {/* Render nested replies */}
             {comment.replies && comment.replies.length > 0 && (
-              <div className="mt-4">
-                {comment.replies.map(reply => renderComment(reply, depth + 1))}
+              <div className="mt-3">
+                {comment.replies.map(reply => renderComment(reply, depth + 1, comment.id || null))}
               </div>
             )}
           </div>
@@ -285,7 +295,7 @@ export default function PostDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-teal-50">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="animate-spin w-16 h-16 border-4 border-green-600 border-t-transparent rounded-full mx-auto mb-4"></div>
           <p className="text-lg text-gray-700 font-medium">Loading post...</p>
@@ -296,7 +306,7 @@ export default function PostDetailPage() {
 
   if (!post) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-teal-50">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Post not found</h2>
           <Link href="/community" className="text-green-600 hover:text-green-700 font-medium">
@@ -308,30 +318,30 @@ export default function PostDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-teal-50">
+    <div className="min-h-screen bg-gray-50">
       {/* Navigation */}
-      <nav className="bg-white shadow-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+      <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <Leaf className="w-8 h-8 text-green-600" />
             <span className="text-2xl font-bold text-gray-900">Eco-Eco</span>
           </Link>
-          <Link href="/community" className="flex items-center gap-2 text-gray-700 hover:text-green-600 transition-colors">
+          <Link href="/community" className="flex items-center gap-2 text-gray-600 hover:text-green-600 transition-colors">
             <ArrowLeft className="w-5 h-5" />
             <span className="font-medium">Back to Community</span>
           </Link>
         </div>
       </nav>
 
-      <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="max-w-4xl mx-auto px-4 py-6">
         {/* Post */}
-        <div className="bg-white rounded-xl p-8 shadow-lg mb-6">
-          <div className="flex gap-6">
+        <div className="bg-white rounded-lg border border-gray-200 mb-4">
+          <div className="flex gap-3 p-3">
             {/* Voting */}
-            <div className="flex flex-col items-center gap-2">
+            <div className="flex flex-col items-center gap-1 pt-1">
               <button
                 onClick={() => handleVote('upvote')}
-                className={`transition-colors text-2xl ${
+                className={`transition-colors text-lg leading-none ${
                   userVote === 'upvote' 
                     ? 'text-green-600' 
                     : 'text-gray-400 hover:text-green-600'
@@ -339,10 +349,10 @@ export default function PostDetailPage() {
               >
                 ▲
               </button>
-              <span className="font-bold text-xl text-gray-900">{post.upvotes - post.downvotes}</span>
+              <span className="font-bold text-xs text-gray-900">{post.upvotes - post.downvotes}</span>
               <button
                 onClick={() => handleVote('downvote')}
-                className={`transition-colors text-2xl ${
+                className={`transition-colors text-lg leading-none ${
                   userVote === 'downvote' 
                     ? 'text-red-600' 
                     : 'text-gray-400 hover:text-red-600'
@@ -353,54 +363,50 @@ export default function PostDetailPage() {
             </div>
 
             {/* Content */}
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-4">
-                <span
-                  className="px-3 py-1 rounded-full text-sm font-medium text-white"
-                  style={{ backgroundColor: CATEGORY_COLORS[post.category] }}
-                >
-                  {post.category}
-                </span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
                 {post.isTip && (
-                  <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium">
+                  <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
                     💡 Tip
                   </span>
                 )}
-                <span className="text-sm text-gray-500">Posted {formatDate(post.createdAt)}</span>
+                <Link
+                  href={`/community/user/${post.authorId}`}
+                  className="text-xs text-gray-500 hover:text-green-600 transition-colors font-medium"
+                >
+                  u/{post.authorName}
+                </Link>
+                <span className="text-xs text-gray-400">•</span>
+                <span className="text-xs text-gray-500">{formatDate(post.createdAt)}</span>
               </div>
               
-              <h1 className="text-3xl font-bold text-gray-900 mb-4">{post.title}</h1>
+              <h1 className="text-lg font-semibold text-gray-900 mb-2">{post.title}</h1>
               
               {post.imageUrl && (
-                <img src={post.imageUrl} alt={post.title || 'Post image'} className="w-full rounded-lg mb-4 max-h-[600px] object-contain" />
+                <img src={post.imageUrl} alt={post.title || 'Post image'} className="w-full rounded-md mb-3 max-h-[600px] object-contain" />
               )}
               
               {post.content && (
-                <div className="text-gray-700 text-lg leading-relaxed whitespace-pre-line mb-6">
+                <div className="text-gray-700 text-sm leading-relaxed whitespace-pre-line mb-3">
                   {post.content}
                 </div>
               )}
 
-              <div className="flex items-center justify-between border-t pt-4">
-                <div className="flex items-center gap-4 text-sm text-gray-500">
-                  <Link
-                    href={`/community/user/${post.authorId}`}
-                    className="hover:text-green-600 transition-colors font-medium"
-                  >
-                    u/{post.authorName}
-                  </Link>
-                  <span className="flex items-center gap-1">
-                    <MessageSquare className="w-4 h-4" />
-                    {post.commentCount} comments
-                  </span>
-                </div>
+              <div className="flex items-center gap-3 text-xs text-gray-500">
+                <span className="flex items-center gap-1 hover:text-green-600 transition-colors cursor-pointer">
+                  <MessageSquare className="w-3 h-3" />
+                  {post.commentCount} comments
+                </span>
+                <span className="flex items-center gap-1 hover:text-green-600 transition-colors cursor-pointer">
+                  Share
+                </span>
                 {user && (post.authorId === user.uid || (community && community.creatorId === user.uid)) && (
                   <button
                     onClick={handleDeletePost}
                     disabled={deleting}
-                    className="flex items-center gap-2 text-red-600 hover:text-red-700 text-sm font-medium disabled:opacity-50"
+                    className="flex items-center gap-1 text-red-600 hover:text-red-700 font-medium disabled:opacity-50 ml-auto"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3 h-3" />
                     {deleting ? 'Deleting...' : 'Delete Post'}
                   </button>
                 )}
@@ -410,62 +416,60 @@ export default function PostDetailPage() {
         </div>
 
         {/* Comments Section */}
-        <div className="bg-white rounded-xl p-8 shadow-lg">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">
-            Comments ({comments.length})
-          </h2>
+        <div className="bg-white rounded-lg border border-gray-200">
+          <div className="p-4 border-b border-gray-200">
+            <h2 className="text-sm font-semibold text-gray-900">
+              Comments ({comments.length})
+            </h2>
+          </div>
 
           {/* Comment Form */}
           {user ? (
-            <form onSubmit={handleSubmitComment} className="mb-8">
-              <textarea
-                value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                placeholder={replyingTo ? "Write a reply..." : "Add a comment..."}
-                className="w-full p-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 mb-4 !text-black placeholder:text-gray-400"
-                rows={4}
-                required
-              />
-              <div className="flex items-center gap-4">
-                <button
-                  type="submit"
-                  disabled={submitting || !commentText.trim()}
-                  className="flex items-center gap-2 bg-green-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Send className="w-5 h-5" />
-                  {submitting ? 'Posting...' : replyingTo ? 'Post Reply' : 'Post Comment'}
-                </button>
-                {replyingTo && (
+            <div className="p-4 border-b border-gray-200">
+              <form onSubmit={handleSubmitComment}>
+                <textarea
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  placeholder="Add a comment..."
+                  className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500 mb-3 !text-black placeholder:text-gray-400 resize-none"
+                  rows={3}
+                  required
+                />
+                <div className="flex items-center justify-end">
                   <button
-                    type="button"
-                    onClick={() => {
-                      setReplyingTo(null);
-                      setCommentText('');
-                    }}
-                    className="px-4 py-2 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                    type="submit"
+                    disabled={submitting || !commentText.trim()}
+                    className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Cancel
+                    <Send className="w-4 h-4" />
+                    {submitting ? 'Posting...' : 'Post Comment'}
                   </button>
-                )}
-              </div>
-            </form>
+                </div>
+              </form>
+            </div>
           ) : (
-            <div className="mb-8 p-4 bg-gray-50 rounded-lg text-center">
-              <p className="text-gray-600 mb-2">Please sign in to comment</p>
-              <Link href="/auth" className="text-green-600 hover:text-green-700 font-medium">
-                Sign In
-              </Link>
+            <div className="p-4 border-b border-gray-200 bg-gray-50">
+              <p className="text-sm text-gray-600 mb-2 text-center">Please sign in to comment</p>
+              <div className="text-center">
+                <Link href="/auth" className="text-sm text-green-600 hover:text-green-700 font-medium">
+                  Sign In
+                </Link>
+              </div>
             </div>
           )}
 
           {/* Comments List */}
-          {comments.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">No comments yet. Be the first to comment!</p>
-          ) : (
-            <div className="space-y-6">
-              {comments.map((comment) => renderComment(comment))}
-            </div>
-          )}
+          <div className="divide-y divide-gray-200">
+            {comments.length === 0 ? (
+              <p className="text-sm text-gray-500 text-center py-8 px-4">No comments yet. Be the first to comment!</p>
+            ) : (
+              comments.map((comment) => (
+                <div key={comment.id} className="p-4">
+                  {renderComment(comment)}
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
     </div>
