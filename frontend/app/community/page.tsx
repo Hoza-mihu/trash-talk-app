@@ -213,9 +213,9 @@ export default function CommunityPage() {
                     <Link
                       key={community.id}
                       href={`/community/c/${community.id}`}
-                      className="block p-2 rounded-lg hover:bg-green-50 transition-colors"
+                      className="block p-3 rounded-lg hover:bg-green-50 transition-colors border border-transparent hover:border-green-200"
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 mb-2">
                         <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
                           {community.name.charAt(0).toUpperCase()}
                         </div>
@@ -224,6 +224,35 @@ export default function CommunityPage() {
                           <p className="text-xs text-gray-500">{community.memberCount} members</p>
                         </div>
                       </div>
+                      {/* Weekly Stats */}
+                      {(community.weeklyVisitors !== undefined || community.weeklyContributions !== undefined) && (
+                        <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-100">
+                          {community.weeklyVisitors !== undefined && (
+                            <div className="text-center">
+                              <div className="text-lg font-bold text-gray-900 mb-0.5">
+                                {community.weeklyVisitors >= 1000000
+                                  ? `${(community.weeklyVisitors / 1000000).toFixed(1)}M`
+                                  : community.weeklyVisitors >= 1000
+                                  ? `${(community.weeklyVisitors / 1000).toFixed(1)}K`
+                                  : community.weeklyVisitors.toLocaleString()}
+                              </div>
+                              <div className="text-[10px] text-gray-500">Weekly visitors</div>
+                            </div>
+                          )}
+                          {community.weeklyContributions !== undefined && (
+                            <div className="text-center">
+                              <div className="text-lg font-bold text-gray-900 mb-0.5">
+                                {community.weeklyContributions >= 1000000
+                                  ? `${(community.weeklyContributions / 1000000).toFixed(1)}M`
+                                  : community.weeklyContributions >= 1000
+                                  ? `${(community.weeklyContributions / 1000).toFixed(1)}K`
+                                  : community.weeklyContributions.toLocaleString()}
+                              </div>
+                              <div className="text-[10px] text-gray-500">Weekly contributions</div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </Link>
                   ))}
                 </div>
@@ -247,7 +276,7 @@ export default function CommunityPage() {
                     return (
                       <div
                         key={community.id}
-                        className="p-2 rounded-lg hover:bg-green-50 transition-colors"
+                        className="p-3 rounded-lg hover:bg-green-50 transition-colors border border-transparent hover:border-green-200"
                       >
                         <div className="flex items-center gap-2 mb-2">
                           <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
@@ -263,6 +292,35 @@ export default function CommunityPage() {
                             <p className="text-xs text-gray-500">{community.memberCount} members</p>
                           </div>
                         </div>
+                        {/* Weekly Stats */}
+                        {(community.weeklyVisitors !== undefined || community.weeklyContributions !== undefined) && (
+                          <div className="grid grid-cols-2 gap-3 pt-2 mb-2 border-t border-gray-100">
+                            {community.weeklyVisitors !== undefined && (
+                              <div className="text-center">
+                                <div className="text-lg font-bold text-gray-900 mb-0.5">
+                                  {community.weeklyVisitors >= 1000000
+                                    ? `${(community.weeklyVisitors / 1000000).toFixed(1)}M`
+                                    : community.weeklyVisitors >= 1000
+                                    ? `${(community.weeklyVisitors / 1000).toFixed(1)}K`
+                                    : community.weeklyVisitors.toLocaleString()}
+                                </div>
+                                <div className="text-[10px] text-gray-500">Weekly visitors</div>
+                              </div>
+                            )}
+                            {community.weeklyContributions !== undefined && (
+                              <div className="text-center">
+                                <div className="text-lg font-bold text-gray-900 mb-0.5">
+                                  {community.weeklyContributions >= 1000000
+                                    ? `${(community.weeklyContributions / 1000000).toFixed(1)}M`
+                                    : community.weeklyContributions >= 1000
+                                    ? `${(community.weeklyContributions / 1000).toFixed(1)}K`
+                                    : community.weeklyContributions.toLocaleString()}
+                                </div>
+                                <div className="text-[10px] text-gray-500">Weekly contributions</div>
+                              </div>
+                            )}
+                          </div>
+                        )}
                         {user && (
                           <button
                             onClick={() => handleJoinCommunity(community.id!)}
