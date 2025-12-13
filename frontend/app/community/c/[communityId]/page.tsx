@@ -611,155 +611,61 @@ export default function CommunityPage() {
       </nav>
 
       <div className="max-w-7xl mx-auto">
-        {/* Community Banner */}
-        <div className="relative h-32 md:h-48 bg-gradient-to-r from-green-400 to-teal-400 overflow-hidden">
-          {(community.bannerUrl || community.imageUrl) && (
-            <img
-              src={community.bannerUrl || community.imageUrl}
-              alt={community.name}
-              className="w-full h-full object-cover"
-            />
-          )}
-          {user && community.creatorId === user.uid && (
-            <button
-              onClick={() => setEditingImages(true)}
-              className="absolute top-4 right-4 bg-black/50 hover:bg-black/70 text-white px-4 py-2 rounded-full flex items-center gap-2 transition-colors text-sm"
-            >
-              <Edit2 className="w-4 h-4" />
-              Edit Banner
-            </button>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 px-4 py-4">
-          {/* Left Sidebar */}
-          <aside className="hidden lg:block lg:col-span-2 space-y-4">
-            <div className="bg-white rounded-lg border border-gray-200 p-4 sticky top-20 space-y-4">
-              <div>
-                <Link href="/" className="flex items-center gap-2 mb-4 text-gray-700 hover:text-green-600 transition-colors">
-                  <Leaf className="w-5 h-5" />
-                  <span className="font-semibold">Eco-Eco</span>
-                </Link>
-                <nav className="space-y-1">
-                  <Link href="/" className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-100 transition-colors">
-                    <Home className="w-4 h-4" />
-                    Home
-                  </Link>
-                  <Link href="/community" className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-100 transition-colors">
-                    <TrendingUp className="w-4 h-4" />
-                    Popular
-                  </Link>
-                  <Link href="/community" className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-100 transition-colors">
-                    <Sparkles className="w-4 h-4" />
-                    All
-                  </Link>
-                </nav>
-              </div>
-
-              {user && (
-                <>
-                  <div className="pt-4 border-t border-gray-200">
-                    <Link
-                      href="/community/create-community"
-                      className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors w-full"
-                    >
-                      <Plus className="w-4 h-4" />
-                      Start a community
-                    </Link>
-                  </div>
-
-                  {userCommunities.length > 0 && (
-                    <div className="pt-4 border-t border-gray-200">
-                      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2 px-2">Your Communities</h4>
-                      <div className="space-y-1 max-h-64 overflow-y-auto">
-                        {userCommunities.slice(0, 10).map((comm) => (
-                          <Link
-                            key={comm.id}
-                            href={`/community/c/${comm.id}`}
-                            className="flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                          >
-                            {comm.iconUrl || comm.imageUrl ? (
-                              <img
-                                src={comm.iconUrl || comm.imageUrl}
-                                alt={comm.name}
-                                className="w-5 h-5 rounded-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-5 h-5 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                                {comm.name.charAt(0).toUpperCase()}
-                              </div>
-                            )}
-                            <span className="truncate">r/{comm.name}</span>
-                          </Link>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {popularCommunities.length > 0 && (
-                    <div className="pt-4 border-t border-gray-200">
-                      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2 px-2">Popular Communities</h4>
-                      <div className="space-y-1 max-h-64 overflow-y-auto">
-                        {popularCommunities.filter(c => c.id !== communityId).slice(0, 5).map((comm) => (
-                          <Link
-                            key={comm.id}
-                            href={`/community/c/${comm.id}`}
-                            className="flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                          >
-                            {comm.iconUrl || comm.imageUrl ? (
-                              <img
-                                src={comm.iconUrl || comm.imageUrl}
-                                alt={comm.name}
-                                className="w-5 h-5 rounded-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-5 h-5 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                                {comm.name.charAt(0).toUpperCase()}
-                              </div>
-                            )}
-                            <span className="truncate">r/{comm.name}</span>
-                          </Link>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </aside>
-
-          {/* Main Content */}
-          <main className="lg:col-span-7 space-y-4">
-            {/* Community Header */}
-            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-              <div className="p-4">
+        {/* Community Banner with Overlapping Icon - Reddit Style */}
+        <div className="relative bg-white">
+          {/* Banner */}
+          <div className="relative h-32 md:h-48 bg-gradient-to-r from-green-400 to-teal-400 overflow-hidden">
+            {(community.bannerUrl || community.imageUrl) && (
+              <img
+                src={community.bannerUrl || community.imageUrl}
+                alt={community.name}
+                className="w-full h-full object-cover"
+              />
+            )}
+            {user && community.creatorId === user.uid && (
+              <button
+                onClick={() => setEditingImages(true)}
+                className="absolute top-4 right-4 bg-black/50 hover:bg-black/70 text-white px-4 py-2 rounded-full flex items-center gap-2 transition-colors text-sm"
+              >
+                <Edit2 className="w-4 h-4" />
+                Edit Banner
+              </button>
+            )}
+          </div>
+          
+          {/* Community Info Section with Overlapping Icon */}
+          <div className="px-4">
+            <div className="bg-white rounded-lg border border-gray-200 border-t-0 rounded-t-none -mt-4 relative">
+              <div className="p-4 pt-8">
                 <div className="flex items-start gap-4">
-                  {/* Community Icon - Overlapping Banner */}
-                  {(community.iconUrl || community.imageUrl) ? (
-                    <img
-                      src={community.iconUrl || community.imageUrl}
-                      alt={community.name}
-                      className="w-20 h-20 rounded-full object-cover border-4 border-white -mt-10 relative z-10"
-                    />
-                  ) : (
-                    <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white font-bold text-3xl border-4 border-white -mt-10 relative z-10">
-                      {community.name.charAt(0).toUpperCase()}
-                    </div>
-                  )}
+                  {/* Community Icon - Overlapping Banner (Reddit Style) */}
+                  <div className="relative -mt-16">
+                    {(community.iconUrl || community.imageUrl) ? (
+                      <img
+                        src={community.iconUrl || community.imageUrl}
+                        alt={community.name}
+                        className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-sm"
+                      />
+                    ) : (
+                      <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white font-bold text-3xl border-4 border-white shadow-sm">
+                        {community.name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    {user && community.creatorId === user.uid && (
+                      <button
+                        onClick={() => setEditingImages(true)}
+                        className="absolute -bottom-1 -right-1 bg-green-600 text-white rounded-full p-1.5 hover:bg-green-700 transition-colors shadow-md"
+                        title="Edit Icon"
+                      >
+                        <Edit2 className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
                   
                   <div className="flex-1 pt-1">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-3">
                         <h1 className="text-2xl font-bold text-gray-900">r/{community.name}</h1>
-                        {user && community.creatorId === user.uid && (
-                          <button
-                            onClick={() => setEditingImages(true)}
-                            className="text-gray-400 hover:text-green-600 transition-colors p-1"
-                            title="Edit Icon"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                        )}
                       </div>
                       
                       {/* Action Buttons Row */}

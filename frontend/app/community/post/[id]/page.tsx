@@ -53,7 +53,7 @@ export default function PostDetailPage() {
       setPost(fetchedPost);
       
       // Load community data if post belongs to a community
-      if (fetchedPost.communityId) {
+      if (fetchedPost && fetchedPost.communityId) {
         try {
           const communityData = await getCommunityById(fetchedPost.communityId);
           setCommunity(communityData);
