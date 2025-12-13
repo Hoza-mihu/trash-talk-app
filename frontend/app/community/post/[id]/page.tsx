@@ -34,6 +34,14 @@ export default function PostDetailPage() {
       if (user) {
         loadUserVote();
       }
+      
+      // Reload comments when post or user changes
+      const interval = setInterval(() => {
+        loadComments();
+        loadPost(); // Also reload post to update comment count
+      }, 5000); // Refresh every 5 seconds
+      
+      return () => clearInterval(interval);
     }
   }, [postId, user]);
 
@@ -481,14 +489,16 @@ export default function PostDetailPage() {
           )}
 
           {/* Comments List */}
-          <div className="divide-y divide-gray-200">
+          <div>
             {comments.length === 0 ? (
               <p className="text-sm text-gray-500 text-center py-8 px-4">No comments yet. Be the first to comment!</p>
             ) : (
-              <div className="divide-y divide-gray-200">
-                {comments.map((comment) => (
-                  <div key={comment.id} className="px-4">
-                    {renderComment(comment)}
+              <div>
+                {comments.map((comment, index) => (
+                  <div key={comment.id || `comment-${index}`} className={index > 0 ? 'border-t border-gray-200' : ''}>
+                    <div className="px-4 py-2">
+                      {renderComment(comment)}
+                    </div>
                   </div>
                 ))}
               </div>
