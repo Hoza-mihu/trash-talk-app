@@ -70,7 +70,9 @@ export default function PostDetailPage() {
 
   const loadComments = async () => {
     try {
+      console.log('Loading comments for post:', postId);
       const fetchedComments = await getCommentsByPostId(postId);
+      console.log('Fetched comments:', fetchedComments);
       setComments(fetchedComments);
     } catch (error) {
       console.error('Error loading comments:', error);

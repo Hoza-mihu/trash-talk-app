@@ -744,10 +744,24 @@ export async function getCommentsByPostId(postId: string): Promise<Comment[]> {
         if (parent) {
           if (!parent.replies) parent.replies = [];
           parent.replies.push(commentWithReplies);
+        } else {
+          // Parent not found, treat as root comment
+          rootComments.push(commentWithReplies);
         }
       } else {
         rootComments.push(commentWithReplies);
       }
+    });
+    
+    // Sort root comments by createdAt (newest first)
+    rootComments.sort((a, b) => {
+      const aTime = a.createdAt instanceof Timestamp 
+        ? a.createdAt.toMillis() 
+        : (a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt).getTime());
+      const bTime = b.createdAt instanceof Timestamp 
+        ? b.createdAt.toMillis() 
+        : (b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt).getTime());
+      return bTime - aTime; // Newest first
     });
     
     return rootComments;
