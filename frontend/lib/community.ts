@@ -24,6 +24,67 @@ import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage
 import { db, storage } from './firebase';
 import { WasteCategoryKey } from './stats';
 
+/**
+ * Calculate hot score using Reddit's ranking algorithm
+ * Formula: (upvotes - downvotes) / (ageInHours + 2)^1.8
+ * This ensures newer posts get a boost, but highly upvoted posts stay hot longer
+ * 
+ * @param upvotes Number of upvotes
+ * @param downvotes Number of downvotes
+ * @param createdAt Post creation timestamp
+ * @returns Hot score (higher = hotter)
+ */
+export function calculateHotScore(
+  upvotes: number,
+  downvotes: number,
+  createdAt: Timestamp | Date
+): number {
+  const score = upvotes - downvotes;
+  const now = new Date();
+  const postDate = createdAt instanceof Timestamp ? createdAt.toDate() : new Date(createdAt);
+  const ageInHours = (now.getTime() - postDate.getTime()) / (1000 * 60 * 60);
+  
+  // Reddit's hot algorithm: score / (age + 2)^gravity
+  // Using 1.8 as gravity factor (Reddit's default)
+  const gravity = 1.8;
+  const denominator = Math.pow(ageInHours + 2, gravity);
+  
+  // Prevent division by zero and handle negative scores
+  return denominator > 0 ? score / denominator : 0;
+}
+
+/**
+ * Firestore Composite Indexes Required:
+ * 
+ * You need to create these indexes in Firebase Console:
+ * 
+ * 1. Collection: community_posts
+ *    Fields: category (Ascending), upvotes (Descending), createdAt (Descending)
+ *    Query: getTipsByCategory
+ * 
+ * 2. Collection: community_posts
+ *    Fields: category (Ascending), hotScore (Descending)
+ *    Query: getHotPostsByCategory
+ * 
+ * 3. Collection: community_posts
+ *    Fields: authorId (Ascending), createdAt (Descending)
+ *    Query: getPostsByUser
+ * 
+ * 4. Collection: community_posts
+ *    Fields: communityId (Ascending), hotScore (Descending)
+ *    Query: getHotPostsByCommunity
+ * 
+ * 5. Collection: comments
+ *    Fields: postId (Ascending), createdAt (Ascending)
+ *    Query: getCommentsByPostId
+ * 
+ * To create indexes:
+ * 1. Go to Firebase Console > Firestore > Indexes
+ * 2. Click "Create Index"
+ * 3. Select collection and add fields as specified above
+ * 4. Or deploy firestore.indexes.json (recommended for team development)
+ */
+
 export interface Community {
   id?: string;
   name: string;
@@ -59,6 +120,7 @@ export interface CommunityPost {
   upvotes: number;
   downvotes: number;
   commentCount: number;
+  hotScore?: number; // Calculated hot score for ranking (Reddit algorithm)
   createdAt: Timestamp | Date;
   updatedAt: Timestamp | Date;
   tags?: string[];
@@ -127,6 +189,9 @@ export async function createPost(
       Object.entries(postData).filter(([_, value]) => value !== undefined)
     );
 
+    const now = serverTimestamp();
+    const initialHotScore = calculateHotScore(0, 0, new Date());
+    
     const postPayload = {
       ...cleanPostData,
       authorId: userId,
@@ -135,6 +200,7 @@ export async function createPost(
       upvotes: 0,
       downvotes: 0,
       commentCount: 0,
+      hotScore: initialHotScore,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     };
@@ -184,77 +250,174 @@ export async function createPost(
   }
 }
 
-// Get posts by category
+// Get posts by category with pagination
+// NOTE: Requires composite index: category (Ascending), createdAt (Descending)
 export async function getPostsByCategory(
   category: WasteCategoryKey,
-  postsLimit: number = 20
-): Promise<CommunityPost[]> {
+  postsLimit: number = 25,
+  lastDoc?: QueryDocumentSnapshot<DocumentData>
+): Promise<{ posts: CommunityPost[]; lastDoc?: QueryDocumentSnapshot<DocumentData> }> {
   try {
-    const q = query(
+    let q = query(
       collection(db, 'community_posts'),
       where('category', '==', category),
       orderBy('createdAt', 'desc'),
       limit(postsLimit)
     );
     
+    if (lastDoc) {
+      q = query(
+        collection(db, 'community_posts'),
+        where('category', '==', category),
+        orderBy('createdAt', 'desc'),
+        startAfter(lastDoc),
+        limit(postsLimit)
+      );
+    }
+    
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
+    const posts = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     } as CommunityPost));
+    
+    return {
+      posts,
+      lastDoc: querySnapshot.docs[querySnapshot.docs.length - 1]
+    };
   } catch (error) {
     console.error('Error fetching posts:', error);
-    return [];
+    return { posts: [] };
   }
 }
 
-// Get all posts (for main feed)
-export async function getAllPosts(postsLimit: number = 50): Promise<CommunityPost[]> {
+// Get all posts (for main feed) with pagination support
+export async function getAllPosts(
+  postsLimit: number = 25,
+  lastDoc?: QueryDocumentSnapshot<DocumentData>
+): Promise<{ posts: CommunityPost[]; lastDoc?: QueryDocumentSnapshot<DocumentData> }> {
   try {
-    const q = query(
+    let q = query(
       collection(db, 'community_posts'),
       orderBy('createdAt', 'desc'),
       limit(postsLimit)
     );
     
+    // Add pagination if lastDoc is provided
+    if (lastDoc) {
+      q = query(
+        collection(db, 'community_posts'),
+        orderBy('createdAt', 'desc'),
+        startAfter(lastDoc),
+        limit(postsLimit)
+      );
+    }
+    
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
+    const posts = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     } as CommunityPost));
+    
+    const newLastDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
+    
+    return {
+      posts,
+      lastDoc: newLastDoc
+    };
   } catch (error) {
     console.error('Error fetching posts:', error);
-    return [];
+    return { posts: [] };
   }
 }
 
-// Get popular posts (by upvotes)
-export async function getPopularPosts(postsLimit: number = 20): Promise<CommunityPost[]> {
+// Get popular posts (by upvotes) with pagination
+export async function getPopularPosts(
+  postsLimit: number = 25,
+  lastDoc?: QueryDocumentSnapshot<DocumentData>
+): Promise<{ posts: CommunityPost[]; lastDoc?: QueryDocumentSnapshot<DocumentData> }> {
   try {
-    const q = query(
+    let q = query(
       collection(db, 'community_posts'),
       orderBy('upvotes', 'desc'),
       limit(postsLimit)
     );
     
+    if (lastDoc) {
+      q = query(
+        collection(db, 'community_posts'),
+        orderBy('upvotes', 'desc'),
+        startAfter(lastDoc),
+        limit(postsLimit)
+      );
+    }
+    
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
+    const posts = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     } as CommunityPost));
+    
+    return {
+      posts,
+      lastDoc: querySnapshot.docs[querySnapshot.docs.length - 1]
+    };
   } catch (error) {
     console.error('Error fetching popular posts:', error);
-    return [];
+    return { posts: [] };
+  }
+}
+
+// Get hot posts (by hot score - Reddit algorithm) with pagination
+// NOTE: Requires composite index: hotScore (Descending), createdAt (Descending)
+export async function getHotPosts(
+  postsLimit: number = 25,
+  lastDoc?: QueryDocumentSnapshot<DocumentData>
+): Promise<{ posts: CommunityPost[]; lastDoc?: QueryDocumentSnapshot<DocumentData> }> {
+  try {
+    let q = query(
+      collection(db, 'community_posts'),
+      orderBy('hotScore', 'desc'),
+      orderBy('createdAt', 'desc'),
+      limit(postsLimit)
+    );
+    
+    if (lastDoc) {
+      q = query(
+        collection(db, 'community_posts'),
+        orderBy('hotScore', 'desc'),
+        orderBy('createdAt', 'desc'),
+        startAfter(lastDoc),
+        limit(postsLimit)
+      );
+    }
+    
+    const querySnapshot = await getDocs(q);
+    const posts = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as CommunityPost));
+    
+    return {
+      posts,
+      lastDoc: querySnapshot.docs[querySnapshot.docs.length - 1]
+    };
+  } catch (error) {
+    console.error('Error fetching hot posts:', error);
+    // Fallback to popular posts if hot score index doesn't exist
+    return getPopularPosts(postsLimit, lastDoc);
   }
 }
 
 // Get tips by category (filtered posts where isTip === true)
+// NOTE: Requires composite index: category (Ascending), isTip (Ascending), upvotes (Descending)
 export async function getTipsByCategory(
   category: WasteCategoryKey,
-  tipsLimit: number = 10
-): Promise<CommunityPost[]> {
+  tipsLimit: number = 25,
+  lastDoc?: QueryDocumentSnapshot<DocumentData>
+): Promise<{ posts: CommunityPost[]; lastDoc?: QueryDocumentSnapshot<DocumentData> }> {
   try {
-    const q = query(
+    let q = query(
       collection(db, 'community_posts'),
       where('category', '==', category),
       where('isTip', '==', true),
@@ -262,14 +425,35 @@ export async function getTipsByCategory(
       limit(tipsLimit)
     );
     
+    if (lastDoc) {
+      q = query(
+        collection(db, 'community_posts'),
+        where('category', '==', category),
+        where('isTip', '==', true),
+        orderBy('upvotes', 'desc'),
+        startAfter(lastDoc),
+        limit(tipsLimit)
+      );
+    }
+    
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
+    const posts = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     } as CommunityPost));
+    
+    return {
+      posts,
+      lastDoc: querySnapshot.docs[querySnapshot.docs.length - 1]
+    };
   } catch (error) {
     console.error('Error fetching tips:', error);
-    return [];
+    // If index doesn't exist, fallback to simpler query
+    const result = await getPostsByCategory(category, tipsLimit, lastDoc);
+    return {
+      posts: result.posts.filter(post => post.isTip === true),
+      lastDoc: result.lastDoc
+    };
   }
 }
 
@@ -329,9 +513,17 @@ export async function voteOnPost(
     
     // If user already voted the same way, remove the vote
     if (existingVote === voteType) {
+      const newUpvotes = voteType === 'upvote' ? postData.upvotes - 1 : postData.upvotes;
+      const newDownvotes = voteType === 'downvote' ? postData.downvotes - 1 : postData.downvotes;
+      const createdAt = postData.createdAt instanceof Timestamp 
+        ? postData.createdAt 
+        : Timestamp.fromDate(new Date(postData.createdAt));
+      const newHotScore = calculateHotScore(newUpvotes, newDownvotes, createdAt);
+      
       // Remove vote
       await updateDoc(postRef, {
         [voteType === 'upvote' ? 'upvotes' : 'downvotes']: increment(-1),
+        hotScore: newHotScore,
         updatedAt: serverTimestamp()
       });
       // Delete vote record
@@ -348,9 +540,16 @@ export async function voteOnPost(
       });
     }
     
-    // Add new vote
+    // Calculate and update hot score
+    const createdAt = postData.createdAt instanceof Timestamp 
+      ? postData.createdAt 
+      : Timestamp.fromDate(new Date(postData.createdAt));
+    const newHotScore = calculateHotScore(newUpvotes, newDownvotes, createdAt);
+    
+    // Add new vote and update hot score
     await updateDoc(postRef, {
       [voteType === 'upvote' ? 'upvotes' : 'downvotes']: increment(1),
+      hotScore: newHotScore,
       updatedAt: serverTimestamp()
     });
     
@@ -1452,4 +1651,7 @@ export function subscribeToNotifications(
     callback(notifications);
   });
 }
+
+
+
 
