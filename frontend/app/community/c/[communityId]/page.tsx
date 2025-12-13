@@ -1381,47 +1381,59 @@ export default function CommunityPage() {
                 </div>
               </div>
               
-              <div className="space-y-2 text-xs pt-2 border-t border-gray-200">
-                <div className="flex items-center justify-between py-1">
-                  <span className="text-gray-500">Members</span>
-                  <span className="font-semibold text-gray-900">{community.memberCount.toLocaleString()}</span>
-                </div>
-                <div className="flex items-center justify-between py-1">
-                  <span className="text-gray-500">Posts</span>
-                  <span className="font-semibold text-gray-900">{community.postCount.toLocaleString()}</span>
-                </div>
-                {community.weeklyVisitors !== undefined && (
-                  <div className="flex items-center justify-between py-1">
-                    <span className="text-gray-500">Weekly visitors</span>
-                    <span className="font-semibold text-gray-900">
-                      {community.weeklyVisitors >= 1000 
-                        ? `${(community.weeklyVisitors / 1000).toFixed(1)}K` 
-                        : community.weeklyVisitors.toLocaleString()}
-                    </span>
-                  </div>
-                )}
-                {community.weeklyContributions !== undefined && (
-                  <div className="flex items-center justify-between py-1">
-                    <span className="text-gray-500">Weekly contributions</span>
-                    <span className="font-semibold text-gray-900">
-                      {community.weeklyContributions >= 1000 
-                        ? `${(community.weeklyContributions / 1000).toFixed(1)}K` 
-                        : community.weeklyContributions.toLocaleString()}
-                    </span>
-                  </div>
-                )}
-                {community.category && (
-                  <div className="flex items-center justify-between py-1">
-                    <span className="text-gray-500">Category</span>
-                    <span
-                      className="px-2 py-0.5 rounded-full text-xs font-medium text-white"
-                      style={{ backgroundColor: CATEGORY_COLORS[community.category] }}
-                    >
-                      {community.category}
-                    </span>
-                  </div>
-                )}
-              </div>
+               <div className="space-y-2 text-xs pt-2 border-t border-gray-200">
+                 <div className="flex items-center justify-between py-1">
+                   <span className="text-gray-500">Members</span>
+                   <span className="font-semibold text-gray-900">{community.memberCount.toLocaleString()}</span>
+                 </div>
+                 <div className="flex items-center justify-between py-1">
+                   <span className="text-gray-500">Posts</span>
+                   <span className="font-semibold text-gray-900">{community.postCount.toLocaleString()}</span>
+                 </div>
+                 {community.category && (
+                   <div className="flex items-center justify-between py-1">
+                     <span className="text-gray-500">Category</span>
+                     <span
+                       className="px-2 py-0.5 rounded-full text-xs font-medium text-white"
+                       style={{ backgroundColor: CATEGORY_COLORS[community.category] }}
+                     >
+                       {community.category}
+                     </span>
+                   </div>
+                 )}
+               </div>
+
+               {/* Weekly Stats - Reddit Style */}
+               {(community.weeklyVisitors !== undefined || community.weeklyContributions !== undefined) && (
+                 <div className="pt-4 border-t border-gray-200">
+                   <div className="grid grid-cols-2 gap-4">
+                     {community.weeklyVisitors !== undefined && (
+                       <div className="text-center">
+                         <div className="text-2xl font-bold text-gray-900 mb-1">
+                           {community.weeklyVisitors >= 1000000
+                             ? `${(community.weeklyVisitors / 1000000).toFixed(1)}M`
+                             : community.weeklyVisitors >= 1000
+                             ? `${(community.weeklyVisitors / 1000).toFixed(1)}K`
+                             : community.weeklyVisitors.toLocaleString()}
+                         </div>
+                         <div className="text-xs text-gray-500">Weekly visitors</div>
+                       </div>
+                     )}
+                     {community.weeklyContributions !== undefined && (
+                       <div className="text-center">
+                         <div className="text-2xl font-bold text-gray-900 mb-1">
+                           {community.weeklyContributions >= 1000000
+                             ? `${(community.weeklyContributions / 1000000).toFixed(1)}M`
+                             : community.weeklyContributions >= 1000
+                             ? `${(community.weeklyContributions / 1000).toFixed(1)}K`
+                             : community.weeklyContributions.toLocaleString()}
+                         </div>
+                         <div className="text-xs text-gray-500">Weekly contributions</div>
+                       </div>
+                     )}
+                   </div>
+                 </div>
+               )}
 
               {/* User Flair Section */}
               {user && isMember && (
