@@ -2386,6 +2386,7 @@ export async function calculateWeeklyCommunityStats(communityId: string): Promis
     const visitorSet = new Set<string>();
     let postCount = 0;
     let commentCount = 0;
+    let allPostIds: string[] = []; // Declare here so it's accessible in all scopes
 
     // Get posts created in the last week for this community
     try {
@@ -2404,6 +2405,14 @@ export async function calculateWeeklyCommunityStats(communityId: string): Promis
         weeklyPostIds.push(doc.id);
       });
       console.log(`[Weekly Stats] Found ${postCount} posts from last week`);
+      
+      // Get ALL post IDs for comments/votes queries (we need all posts, not just weekly ones)
+      const allPostsQuery = query(
+        collection(db, 'community_posts'),
+        where('communityId', '==', communityId)
+      );
+      const allPostsSnapshot = await getDocs(allPostsQuery);
+      allPostIds = allPostsSnapshot.docs.map(doc => doc.id);
     } catch (postsError) {
       console.error('[Weekly Stats] Error querying posts:', postsError);
       // If query fails, try without date filter as fallback
@@ -2413,7 +2422,9 @@ export async function calculateWeeklyCommunityStats(communityId: string): Promis
           where('communityId', '==', communityId)
         );
         const allPostsSnapshot = await getDocs(allPostsQuery);
-        // Filter client-side
+        allPostIds = allPostsSnapshot.docs.map(doc => doc.id);
+        
+        // Filter client-side for posts
         const now = Date.now();
         const oneWeekAgoMs = now - (7 * 24 * 60 * 60 * 1000);
         allPostsSnapshot.forEach((doc) => {
@@ -2437,16 +2448,9 @@ export async function calculateWeeklyCommunityStats(communityId: string): Promis
         console.log(`[Weekly Stats] Fallback: Found ${postCount} posts from last week (client-side filter)`);
       } catch (fallbackError) {
         console.error('[Weekly Stats] Fallback query also failed:', fallbackError);
+        allPostIds = [];
       }
     }
-
-    // Get ALL post IDs in this community (to find comments on any post from this week)
-    const allPostsQuery = query(
-      collection(db, 'community_posts'),
-      where('communityId', '==', communityId)
-    );
-    const allPostsSnapshot = await getDocs(allPostsQuery);
-    const allPostIds = allPostsSnapshot.docs.map(doc => doc.id);
 
     // Get ALL comments created in the last week for posts in this community
     // Try to query by communityId first (more efficient), fallback to postId batches
@@ -2505,11 +2509,43 @@ export async function calculateWeeklyCommunityStats(communityId: string): Promis
           const votesSnapshot = await getDocs(votesQuery);
           votesSnapshot.forEach((doc) => {
             const data = doc.data();
-            visitorSet.add(data.userId);
+            if (data.userId) {
+              visitorSet.add(data.userId);
+            }
           });
+          console.log(`[Weekly Stats] Found ${votesSnapshot.size} votes in batch ${i}-${i + batchSize}`);
         } catch (error) {
-          // If createdAt field doesn't exist on votes or query fails, skip
-          console.warn('Could not filter votes by createdAt:', error);
+          // If createdAt field doesn't exist on votes or query fails, skip this batch
+          console.warn(`[Weekly Stats] Could not filter votes by createdAt for batch ${i}-${i + batchSize}:`, error);
+          // Try querying without createdAt filter as fallback
+          try {
+            const votesFallbackQuery = query(
+              collection(db, 'votes'),
+              where('postId', 'in', postIdsBatch)
+            );
+            const votesFallbackSnapshot = await getDocs(votesFallbackQuery);
+            // Filter client-side
+            const oneWeekAgoMs = new Date().getTime() - (7 * 24 * 60 * 60 * 1000);
+            votesFallbackSnapshot.forEach((doc) => {
+              const data = doc.data();
+              const createdAt = data.createdAt;
+              let voteDate: Date | null = null;
+              
+              if (createdAt?.toDate) {
+                voteDate = createdAt.toDate();
+              } else if (createdAt instanceof Date) {
+                voteDate = createdAt;
+              } else if (createdAt) {
+                voteDate = new Date(createdAt);
+              }
+              
+              if (voteDate && voteDate.getTime() >= oneWeekAgoMs && data.userId) {
+                visitorSet.add(data.userId);
+              }
+            });
+          } catch (fallbackError) {
+            console.warn(`[Weekly Stats] Fallback vote query also failed for batch ${i}-${i + batchSize}:`, fallbackError);
+          }
         }
       }
     }

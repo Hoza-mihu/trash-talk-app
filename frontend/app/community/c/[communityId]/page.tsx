@@ -331,12 +331,19 @@ export default function CommunityPage() {
         const stats = await calculateWeeklyCommunityStats(communityId);
         console.log('[Community Page] Weekly stats calculated:', stats);
         
-        // Reload to get updated stats - wait a bit for Firestore to update
+        // Update local state immediately with calculated stats (no need to wait for Firestore)
+        setCommunity(prev => ({
+          ...prev,
+          weeklyVisitors: stats.weeklyVisitors,
+          weeklyContributions: stats.weeklyContributions
+        }));
+        
+        // Also try to reload from Firestore after a short delay as a backup
         setTimeout(async () => {
           try {
             const updated = await getCommunityById(communityId);
-            if (updated) {
-              console.log('[Community Page] Updated community with stats:', {
+            if (updated && (updated.weeklyVisitors !== undefined || updated.weeklyContributions !== undefined)) {
+              console.log('[Community Page] Updated community with stats from Firestore:', {
                 weeklyVisitors: updated.weeklyVisitors,
                 weeklyContributions: updated.weeklyContributions
               });
@@ -345,10 +352,10 @@ export default function CommunityPage() {
           } catch (reloadError) {
             console.error('[Community Page] Error reloading community:', reloadError);
           }
-        }, 500); // Small delay to ensure Firestore has updated
+        }, 1000); // Delay to ensure Firestore has updated
       } catch (error) {
         console.error('[Community Page] Error calculating weekly stats:', error);
-        // Still try to load existing stats from community document
+        // Still use existing stats from community document if available
         if (fetched.weeklyVisitors !== undefined || fetched.weeklyContributions !== undefined) {
           console.log('[Community Page] Using existing stats from community document');
         }
