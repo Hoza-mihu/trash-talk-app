@@ -653,10 +653,15 @@ export async function addComment(
   parentId?: string
 ): Promise<string> {
   try {
-    // Get post to retrieve post author ID
+    // Get post to retrieve post author ID and community info
     const postRef = doc(db, 'community_posts', postId);
     const postSnap = await getDoc(postRef);
-    const postAuthorId = postSnap.exists() ? (postSnap.data() as CommunityPost).authorId : null;
+    if (!postSnap.exists()) {
+      throw new Error('Post not found');
+    }
+    
+    const postData = postSnap.data() as CommunityPost;
+    const postAuthorId = postData.authorId || null;
 
     const commentRef = await addDoc(collection(db, 'comments'), {
       postId,
@@ -680,14 +685,11 @@ export async function addComment(
       });
     }
     
-    // Update post comment count (reuse postRef from above)
+    // Update post comment count
     await updateDoc(postRef, {
       commentCount: increment(1),
       updatedAt: serverTimestamp()
     });
-    
-    // Get post data to check if it belongs to a community
-    const postData = postSnap.data() as CommunityPost;
     
     // Calculate achievements and update stats if post belongs to a community
     if (postData.communityId) {
