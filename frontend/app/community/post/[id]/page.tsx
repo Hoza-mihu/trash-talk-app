@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, MessageSquare, ThumbsUp, ThumbsDown, Leaf, Send, Trash2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { getPostById, addComment, getCommentsByPostId, voteOnPost, getUserVote, deletePost, Comment } from '@/lib/community';
+import { getPostById, addComment, getCommentsByPostId, voteOnPost, getUserVote, deletePost, getCommunityById, Comment, Community } from '@/lib/community';
 import { getUserProfile } from '@/lib/profile';
 import { CommunityPost } from '@/lib/community';
 import { CATEGORY_COLORS } from '@/lib/stats';
@@ -17,6 +17,7 @@ export default function PostDetailPage() {
   const postId = params.id as string;
   
   const [post, setPost] = useState<CommunityPost | null>(null);
+  const [community, setCommunity] = useState<Community | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [commentText, setCommentText] = useState('');
@@ -50,6 +51,16 @@ export default function PostDetailPage() {
     try {
       const fetchedPost = await getPostById(postId);
       setPost(fetchedPost);
+      
+      // Load community data if post belongs to a community
+      if (fetchedPost.communityId) {
+        try {
+          const communityData = await getCommunityById(fetchedPost.communityId);
+          setCommunity(communityData);
+        } catch (error) {
+          console.error('Error loading community:', error);
+        }
+      }
     } catch (error) {
       console.error('Error loading post:', error);
     } finally {
@@ -369,7 +380,7 @@ export default function PostDetailPage() {
                     {post.commentCount} comments
                   </span>
                 </div>
-                {user && post.authorId === user.uid && (
+                {user && (post.authorId === user.uid || (community && community.creatorId === user.uid)) && (
                   <button
                     onClick={handleDeletePost}
                     disabled={deleting}
