@@ -531,14 +531,20 @@ export async function voteOnPost(
       return;
     }
     
+    // Calculate new vote counts after this vote operation
+    let newUpvotes = postData.upvotes;
+    let newDownvotes = postData.downvotes;
+    
     // If user voted opposite way, switch the vote
     if (existingVote && existingVote !== voteType) {
       // Remove old vote
-      await updateDoc(postRef, {
-        [existingVote === 'upvote' ? 'upvotes' : 'downvotes']: increment(-1),
-        updatedAt: serverTimestamp()
-      });
+      newUpvotes = existingVote === 'upvote' ? newUpvotes - 1 : newUpvotes;
+      newDownvotes = existingVote === 'downvote' ? newDownvotes - 1 : newDownvotes;
     }
+    
+    // Add new vote
+    newUpvotes = voteType === 'upvote' ? newUpvotes + 1 : newUpvotes;
+    newDownvotes = voteType === 'downvote' ? newDownvotes + 1 : newDownvotes;
     
     // Calculate and update hot score
     const createdAt = postData.createdAt instanceof Timestamp 
@@ -546,12 +552,23 @@ export async function voteOnPost(
       : Timestamp.fromDate(new Date(postData.createdAt));
     const newHotScore = calculateHotScore(newUpvotes, newDownvotes, createdAt);
     
-    // Add new vote and update hot score
-    await updateDoc(postRef, {
-      [voteType === 'upvote' ? 'upvotes' : 'downvotes']: increment(1),
-      hotScore: newHotScore,
-      updatedAt: serverTimestamp()
-    });
+    // Update post with new votes and hot score (atomic operation)
+    if (existingVote && existingVote !== voteType) {
+      // Switch vote: remove old, add new, update hot score
+      await updateDoc(postRef, {
+        [existingVote === 'upvote' ? 'upvotes' : 'downvotes']: increment(-1),
+        [voteType === 'upvote' ? 'upvotes' : 'downvotes']: increment(1),
+        hotScore: newHotScore,
+        updatedAt: serverTimestamp()
+      });
+    } else {
+      // New vote: just add and update hot score
+      await updateDoc(postRef, {
+        [voteType === 'upvote' ? 'upvotes' : 'downvotes']: increment(1),
+        hotScore: newHotScore,
+        updatedAt: serverTimestamp()
+      });
+    }
     
     // Record the vote
     await setDoc(voteRef, {
