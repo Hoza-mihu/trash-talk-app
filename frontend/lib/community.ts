@@ -2091,7 +2091,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     type: 'top_25_poster',
     name: 'Top 25% Poster',
     description: 'In the top 25% of posters in this community',
-    icon: '👑',
+    icon: '📝',
     color: '#EF4444',
     requirement: (stats, allStats) => {
       if (stats.postCount === 0) return false;
@@ -2105,7 +2105,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     type: 'top_10_poster',
     name: 'Top 10% Poster',
     description: 'In the top 10% of posters in this community',
-    icon: '👑',
+    icon: '✍️',
     color: '#F97316',
     requirement: (stats, allStats) => {
       if (stats.postCount === 0) return false;
@@ -2119,7 +2119,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     type: 'top_5_poster',
     name: 'Top 5% Poster',
     description: 'In the top 5% of posters in this community',
-    icon: '👑',
+    icon: '📄',
     color: '#F59E0B',
     requirement: (stats, allStats) => {
       if (stats.postCount === 0) return false;
@@ -2133,7 +2133,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     type: 'top_1_poster',
     name: 'Top 1% Poster',
     description: 'In the top 1% of posters in this community',
-    icon: '👑',
+    icon: '🏆',
     color: '#EAB308',
     requirement: (stats, allStats) => {
       if (stats.postCount === 0) return false;
@@ -2147,7 +2147,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     type: 'top_25_commenter',
     name: 'Top 25% Commenter',
     description: 'In the top 25% of commenters in this community',
-    icon: '💬',
+    icon: '💭',
     color: '#8B5CF6',
     requirement: (stats, allStats) => {
       if (stats.commentCount === 0) return false;
@@ -2161,7 +2161,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     type: 'top_10_commenter',
     name: 'Top 10% Commenter',
     description: 'In the top 10% of commenters in this community',
-    icon: '💬',
+    icon: '💡',
     color: '#A855F7',
     requirement: (stats, allStats) => {
       if (stats.commentCount === 0) return false;
@@ -2175,7 +2175,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     type: 'top_5_commenter',
     name: 'Top 5% Commenter',
     description: 'In the top 5% of commenters in this community',
-    icon: '💬',
+    icon: '🎯',
     color: '#C084FC',
     requirement: (stats, allStats) => {
       if (stats.commentCount === 0) return false;
@@ -2189,7 +2189,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     type: 'top_1_commenter',
     name: 'Top 1% Commenter',
     description: 'In the top 1% of commenters in this community',
-    icon: '💬',
+    icon: '💎',
     color: '#DDD6FE',
     requirement: (stats, allStats) => {
       if (stats.commentCount === 0) return false;
