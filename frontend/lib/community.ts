@@ -108,6 +108,7 @@ export interface Community {
   communityType?: 'public' | 'restricted' | 'private';
   matureContent?: boolean;
   topics?: string[]; // Selected topics (up to 3)
+  moderators?: Moderator[];
 }
 
 export interface CommunityAchievement {
@@ -199,6 +200,23 @@ export interface Vote {
   userId: string;
   postId: string;
   type: 'upvote' | 'downvote';
+}
+
+export interface Moderator {
+  userId: string;
+  userName: string;
+  userPhotoUrl?: string | null;
+  addedAt?: Timestamp | Date;
+}
+
+export interface ModRequest {
+  id?: string;
+  userId: string;
+  userName: string;
+  userPhotoUrl?: string | null;
+  message?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: Timestamp | Date;
 }
 
 export interface Notification {
@@ -1158,6 +1176,121 @@ export async function getCommunityById(communityId: string): Promise<Community |
   } catch (error) {
     console.error('Error fetching community:', error);
     return null;
+  }
+}
+
+export async function getModerators(communityId: string): Promise<Moderator[]> {
+  try {
+    const comm = await getCommunityById(communityId);
+    if (!comm || !comm.moderators) return [];
+    return comm.moderators;
+  } catch (error) {
+    console.error('Error fetching moderators:', error);
+    return [];
+  }
+}
+
+export async function requestModerator(
+  communityId: string,
+  userId: string,
+  userName: string,
+  userPhotoUrl: string | null,
+  message?: string
+) {
+  try {
+    const reqRef = collection(db, 'communities', communityId, 'modRequests');
+    await addDoc(reqRef, {
+      userId,
+      userName,
+      userPhotoUrl: userPhotoUrl || null,
+      message: message || '',
+      status: 'pending',
+      createdAt: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error requesting moderator role:', error);
+    throw error;
+  }
+}
+
+export async function getModeratorRequests(communityId: string): Promise<ModRequest[]> {
+  try {
+    const reqRef = collection(db, 'communities', communityId, 'modRequests');
+    const q = query(reqRef, where('status', '==', 'pending'), orderBy('createdAt', 'desc'), limit(20));
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() } as ModRequest));
+  } catch (error) {
+    console.error('Error fetching moderator requests:', error);
+    return [];
+  }
+}
+
+export async function approveModerator(
+  communityId: string,
+  requestId: string,
+  moderator: Moderator
+) {
+  try {
+    const commRef = doc(db, 'communities', communityId);
+    const reqRef = doc(db, 'communities', communityId, 'modRequests', requestId);
+    const commSnap = await getDoc(commRef);
+    if (!commSnap.exists()) throw new Error('Community not found');
+    const data = commSnap.data() as Community;
+    const existing = data.moderators || [];
+    const already = existing.some((m) => m.userId === moderator.userId);
+    const updated = already ? existing : [...existing, { ...moderator, addedAt: new Date() }];
+    await updateDoc(commRef, { moderators: updated, updatedAt: serverTimestamp() });
+    await updateDoc(reqRef, { status: 'approved', updatedAt: serverTimestamp() });
+  } catch (error) {
+    console.error('Error approving moderator:', error);
+    throw error;
+  }
+}
+
+export async function rejectModerator(communityId: string, requestId: string) {
+  try {
+    const reqRef = doc(db, 'communities', communityId, 'modRequests', requestId);
+    await updateDoc(reqRef, { status: 'rejected', updatedAt: serverTimestamp() });
+  } catch (error) {
+    console.error('Error rejecting moderator:', error);
+    throw error;
+  }
+}
+
+export async function removeModerator(communityId: string, moderatorId: string) {
+  try {
+    const commRef = doc(db, 'communities', communityId);
+    const commSnap = await getDoc(commRef);
+    if (!commSnap.exists()) throw new Error('Community not found');
+    const data = commSnap.data() as Community;
+    const existing = data.moderators || [];
+    const updated = existing.filter((m) => m.userId !== moderatorId);
+    await updateDoc(commRef, { moderators: updated, updatedAt: serverTimestamp() });
+  } catch (error) {
+    console.error('Error removing moderator:', error);
+    throw error;
+  }
+}
+
+export async function sendModeratorMessage(
+  communityId: string,
+  payload: {
+    fromUserId: string;
+    fromUserName: string;
+    fromUserPhotoUrl?: string | null;
+    to: 'admin' | 'moderators';
+    text: string;
+  }
+) {
+  try {
+    const msgsRef = collection(db, 'communities', communityId, 'modMessages');
+    await addDoc(msgsRef, {
+      ...payload,
+      createdAt: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error sending moderator message:', error);
+    throw error;
   }
 }
 

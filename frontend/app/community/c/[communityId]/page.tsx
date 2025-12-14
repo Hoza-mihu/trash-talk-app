@@ -38,7 +38,16 @@ import {
   CommunityPost,
   Notification,
   CommunityAchievement,
-  AchievementType
+  AchievementType,
+  getModerators,
+  requestModerator,
+  getModeratorRequests,
+  approveModerator,
+  rejectModerator,
+  removeModerator,
+  sendModeratorMessage,
+  Moderator,
+  ModRequest
 } from '@/lib/community';
 import { CATEGORY_COLORS } from '@/lib/stats';
 import ShareDropdown from '@/components/ShareDropdown';
@@ -88,6 +97,14 @@ export default function CommunityPage() {
   const [showAllAchievements, setShowAllAchievements] = useState(false);
   const [crosspostModalPost, setCrosspostModalPost] = useState<{ id: string; title: string } | null>(null);
   const [awardOpenId, setAwardOpenId] = useState<string | null>(null);
+  const [moderators, setModerators] = useState<Moderator[]>([]);
+  const [modRequests, setModRequests] = useState<ModRequest[]>([]);
+  const [loadingModerators, setLoadingModerators] = useState(false);
+  const [loadingRequests, setLoadingRequests] = useState(false);
+  const [sendingRequest, setSendingRequest] = useState(false);
+  const [requestMessage, setRequestMessage] = useState('');
+  const [messageText, setMessageText] = useState('');
+  const [messageTarget, setMessageTarget] = useState<'admin' | 'moderators'>('moderators');
 
   useEffect(() => {
     if (communityId) {
@@ -155,6 +172,18 @@ export default function CommunityPage() {
     // Resort locally when time range changes for top
     setPosts((prev) => sortPostsByOption(prev, sortOption));
   }, [topRange]);
+
+  useEffect(() => {
+    if (communityId) {
+      loadModerators();
+    }
+  }, [communityId]);
+
+  useEffect(() => {
+    if (communityId && community?.creatorId && user?.uid === community.creatorId) {
+      loadModeratorRequests();
+    }
+  }, [communityId, community?.creatorId, user?.uid]);
 
   // Reload posts when page becomes visible (e.g., returning from create post)
   useEffect(() => {
@@ -279,6 +308,32 @@ export default function CommunityPage() {
       setPopularCommunities(fetched);
     } catch (error) {
       console.error('Error loading popular communities:', error);
+    }
+  };
+
+  const loadModerators = async () => {
+    if (!communityId) return;
+    setLoadingModerators(true);
+    try {
+      const fetched = await getModerators(communityId);
+      setModerators(fetched);
+    } catch (error) {
+      console.error('Error loading moderators:', error);
+    } finally {
+      setLoadingModerators(false);
+    }
+  };
+
+  const loadModeratorRequests = async () => {
+    if (!communityId || !user || community?.creatorId !== user.uid) return;
+    setLoadingRequests(true);
+    try {
+      const fetched = await getModeratorRequests(communityId);
+      setModRequests(fetched);
+    } catch (error) {
+      console.error('Error loading moderator requests:', error);
+    } finally {
+      setLoadingRequests(false);
     }
   };
 
@@ -506,6 +561,72 @@ export default function CommunityPage() {
     }
   };
 
+  const handleRequestModerator = async () => {
+    if (!user || !communityId) return;
+    setSendingRequest(true);
+    try {
+      await requestModerator(communityId, user.uid, user.displayName || user.email || 'User', user.photoURL, requestMessage);
+      alert('Request sent to admin.');
+      setRequestMessage('');
+    } catch (error: any) {
+      alert(error.message || 'Failed to send request.');
+    } finally {
+      setSendingRequest(false);
+    }
+  };
+
+  const handleApproveModerator = async (req: ModRequest) => {
+    if (!communityId) return;
+    try {
+      await approveModerator(communityId, req.id!, {
+        userId: req.userId,
+        userName: req.userName,
+        userPhotoUrl: req.userPhotoUrl || undefined
+      });
+      await loadModerators();
+      await loadModeratorRequests();
+    } catch (error: any) {
+      alert(error.message || 'Failed to approve moderator.');
+    }
+  };
+
+  const handleRejectModerator = async (req: ModRequest) => {
+    if (!communityId) return;
+    try {
+      await rejectModerator(communityId, req.id!);
+      await loadModeratorRequests();
+    } catch (error: any) {
+      alert(error.message || 'Failed to reject request.');
+    }
+  };
+
+  const handleRemoveModerator = async (moderatorId: string) => {
+    if (!communityId) return;
+    try {
+      await removeModerator(communityId, moderatorId);
+      await loadModerators();
+    } catch (error: any) {
+      alert(error.message || 'Failed to remove moderator.');
+    }
+  };
+
+  const handleSendModeratorMessage = async () => {
+    if (!user || !communityId || !messageText.trim()) return;
+    try {
+      await sendModeratorMessage(communityId, {
+        fromUserId: user.uid,
+        fromUserName: user.displayName || user.email || 'User',
+        fromUserPhotoUrl: user.photoURL || undefined,
+        to: messageTarget,
+        text: messageText.trim()
+      });
+      setMessageText('');
+      alert('Message sent.');
+    } catch (error: any) {
+      alert(error.message || 'Failed to send message.');
+    }
+  };
+
   const handleDeleteCommunity = async () => {
     if (!user || !community) return;
     
@@ -672,6 +793,9 @@ export default function CommunityPage() {
         return working;
     }
   };
+
+  const isAdmin = user && community?.creatorId === user.uid;
+  const isModerator = user ? moderators.some((m) => m.userId === user.uid) : false;
 
   const awardOptions = [
     // Eco / sustainability
@@ -1792,6 +1916,149 @@ export default function CommunityPage() {
                     </div>
                   </div>
                 </div>
+
+              {/* Moderators */}
+              <div className="pt-4 border-t border-gray-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                    Moderators
+                  </h4>
+                  {user && !isAdmin && !isModerator && (
+                    <button
+                      onClick={handleRequestModerator}
+                      disabled={sendingRequest}
+                      className="text-xs font-semibold text-green-600 hover:text-green-700"
+                    >
+                      {sendingRequest ? 'Requesting...' : 'Request mod'}
+                    </button>
+                  )}
+                </div>
+
+                {user && !isAdmin && !isModerator && (
+                  <div className="space-y-2">
+                    <textarea
+                      value={requestMessage}
+                      onChange={(e) => setRequestMessage(e.target.value)}
+                      placeholder="Why should you be a moderator?"
+                      className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                      rows={2}
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-500 to-teal-500 flex items-center justify-center text-white font-bold">
+                      {community.creatorName?.charAt(0) || 'A'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-gray-900 truncate">{community.creatorName || 'Admin'}</span>
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Admin</span>
+                      </div>
+                    </div>
+                  </div>
+                  {loadingModerators && <div className="text-xs text-gray-500">Loading moderators...</div>}
+                  {!loadingModerators && moderators.length === 0 && (
+                    <div className="text-xs text-gray-500">No moderators yet.</div>
+                  )}
+                  {!loadingModerators && moderators.length > 0 && (
+                    <div className="space-y-2">
+                      {moderators.map((mod) => (
+                        <div key={mod.userId} className="flex items-center gap-2">
+                          {mod.userPhotoUrl ? (
+                            <img src={mod.userPhotoUrl} alt={mod.userName} className="w-8 h-8 rounded-full object-cover" />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-700 font-bold">
+                              {mod.userName?.charAt(0) || 'M'}
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-semibold text-gray-900 truncate">{mod.userName}</span>
+                              <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Moderator</span>
+                            </div>
+                          </div>
+                          {isAdmin && (
+                            <button
+                              onClick={() => handleRemoveModerator(mod.userId)}
+                              className="text-xs text-red-600 hover:text-red-700"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={messageText}
+                      onChange={(e) => setMessageText(e.target.value)}
+                      placeholder="Message admin/mods"
+                      className="flex-1 border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                    />
+                    <select
+                      value={messageTarget}
+                      onChange={(e) => setMessageTarget(e.target.value as 'admin' | 'moderators')}
+                      className="border border-gray-200 rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                    >
+                      <option value="moderators">Mods</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                    <button
+                      onClick={handleSendModeratorMessage}
+                      className="px-3 py-2 rounded-md bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors"
+                    >
+                      Send
+                    </button>
+                  </div>
+                </div>
+
+                {isAdmin && (
+                  <div className="pt-3 border-t border-gray-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h5 className="text-xs font-semibold text-gray-900 uppercase">Requests</h5>
+                      {loadingRequests && <span className="text-[11px] text-gray-500">Loading...</span>}
+                    </div>
+                    {modRequests.length === 0 && !loadingRequests && (
+                      <div className="text-xs text-gray-500">No pending requests.</div>
+                    )}
+                    {modRequests.map((req) => (
+                      <div key={req.id} className="flex items-center gap-2">
+                        {req.userPhotoUrl ? (
+                          <img src={req.userPhotoUrl} alt={req.userName} className="w-7 h-7 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center text-gray-700 font-bold text-xs">
+                            {req.userName?.charAt(0) || 'U'}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-semibold text-gray-900 truncate">{req.userName}</div>
+                          {req.message && <div className="text-xs text-gray-600 line-clamp-2">{req.message}</div>}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleApproveModerator(req)}
+                            className="text-xs text-green-600 hover:text-green-700 font-semibold"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => handleRejectModerator(req)}
+                            className="text-xs text-red-600 hover:text-red-700 font-semibold"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               {/* User Flair Section */}
               {user && isMember && (
