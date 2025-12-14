@@ -1322,11 +1322,11 @@ export default function CommunityPage() {
                     >
                       <Link
                         href={`/community/post/${post.id}`}
-                        className="block"
+                        className="block p-3"
                       >
                         <div className="flex gap-3 p-3">
-                          {/* Voting */}
-                          <div className="flex flex-col items-center gap-1 pt-1">
+                          {/* Voting column hidden (footer bar handles actions) */}
+                          <div className="hidden flex-col items-center gap-1 pt-1">
                             <button
                               onClick={(e) => {
                                 e.preventDefault();
@@ -1396,8 +1396,8 @@ export default function CommunityPage() {
                               </span>
                             </div>
 
-                            {/* Inline action bar similar to Reddit */}
-                            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-gray-600">
+                            {/* Inline action bar similar to Reddit (hidden, replaced by footer bar) */}
+                            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-gray-600 hidden">
                               <div className="flex items-center gap-2">
                                 <button
                                   onClick={(e) => {
@@ -1473,6 +1473,106 @@ export default function CommunityPage() {
                           </div>
                         </div>
                       </Link>
+                      {/* Footer action bar - Reddit style */}
+                      <div className="flex items-center justify-between px-3 py-2 border-t border-gray-100 bg-gray-50/60 text-sm text-gray-600">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <div className="flex items-center gap-1 rounded-full border border-gray-200 bg-white px-2 py-1">
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                // hook upvote
+                              }}
+                              className="text-gray-500 hover:text-green-600 transition-colors"
+                              title="Upvote"
+                            >
+                              <ArrowUp className="w-4 h-4" />
+                            </button>
+                            <span className="font-semibold text-gray-900 text-sm min-w-[1.5rem] text-center">
+                              {post.upvotes - post.downvotes}
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                // hook downvote
+                              }}
+                              className="text-gray-500 hover:text-red-600 transition-colors"
+                              title="Downvote"
+                            >
+                              <ArrowDown className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
+                            className="flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1 hover:border-green-500 hover:text-green-600 transition-colors"
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                            {post.commentCount} comments
+                          </button>
+
+                          <div className="relative">
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setAwardOpenId((prev) => (prev === post.id ? null : post.id || null));
+                              }}
+                              className="flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-3 py-1 hover:bg-amber-100 hover:border-amber-300 transition-colors"
+                            >
+                              <Award className="w-4 h-4" />
+                              Award
+                            </button>
+                            {awardOpenId === post.id && (
+                              <div className="absolute z-50 mt-2 w-72 rounded-lg border border-gray-200 bg-white shadow-xl p-3 space-y-2">
+                                <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Give an award</div>
+                                {awardOptions.map((a) => (
+                                  <button
+                                    key={a.name}
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleGiveAward(post.id!, a.name);
+                                    }}
+                                    className="w-full text-left flex items-start gap-3 rounded-md px-3 py-2 hover:bg-gray-50 transition-colors"
+                                  >
+                                    <div className="mt-1">{renderAwardIcon(a.icon)}</div>
+                                    <div>
+                                      <div className="text-sm font-semibold text-gray-900">{a.name}</div>
+                                      <div className="text-xs text-gray-500">{a.desc}</div>
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                            <ShareDropdown
+                              postId={post.id!}
+                              postTitle={post.title}
+                              postImageUrl={post.imageUrl}
+                              onCrosspostClick={() => setCrosspostModalPost({ id: post.id!, title: post.title })}
+                            />
+                          </div>
+                        </div>
+
+                        {canDelete && (
+                          <button
+                            onClick={(e) => handleDeletePost(post.id!, e)}
+                            disabled={deletingPostId === post.id}
+                            className="flex items-center gap-1 text-red-600 hover:text-red-700 text-sm font-semibold disabled:opacity-50"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            {deletingPostId === post.id ? 'Deleting...' : 'Delete Post'}
+                          </button>
+                        )}
+                      </div>
+
                       {/* Delete button for post author or community creator */}
                       {canDelete && (
                         <div className="px-3 pb-3 flex justify-end">

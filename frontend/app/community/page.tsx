@@ -552,36 +552,43 @@ export default function CommunityPage() {
                           </span>
                         </div>
 
-                        {/* Action bar like Reddit */}
-                        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-gray-600">
-                          <div className="flex items-center gap-2">
+                        {/* Action bar - Reddit style pills */}
+                        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-gray-700">
+                          <div className="flex items-center gap-1 rounded-full border border-gray-200 bg-white px-2 py-1">
                             <button
                               onClick={(e) => {
                                 e.preventDefault();
                                 // hook actual vote here
                               }}
-                              className="inline-flex items-center justify-center px-2 py-1 rounded-full border border-gray-200 hover:border-green-500 hover:text-green-600 transition-colors"
+                              className="text-gray-500 hover:text-green-600 transition-colors"
                               title="Upvote"
                             >
                               <ArrowUp className="w-4 h-4" />
                             </button>
-                            <span className="font-semibold text-gray-900">{post.upvotes - post.downvotes}</span>
+                            <span className="font-semibold text-gray-900 text-sm min-w-[1.5rem] text-center">
+                              {post.upvotes - post.downvotes}
+                            </span>
                             <button
                               onClick={(e) => {
                                 e.preventDefault();
                                 // hook actual vote here
                               }}
-                              className="inline-flex items-center justify-center px-2 py-1 rounded-full border border-gray-200 hover:border-red-500 hover:text-red-600 transition-colors"
+                              className="text-gray-500 hover:text-red-600 transition-colors"
                               title="Downvote"
                             >
                               <ArrowDown className="w-4 h-4" />
                             </button>
                           </div>
 
-                          <span className="flex items-center gap-1 px-3 py-1 rounded-full border border-gray-200 hover:border-green-500 hover:text-green-600 transition-colors">
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                            }}
+                            className="flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1 hover:border-green-500 hover:text-green-600 transition-colors"
+                          >
                             <MessageSquare className="w-4 h-4" />
                             {post.commentCount} comments
-                          </span>
+                          </button>
 
                           <div className="relative">
                             <button
@@ -589,7 +596,7 @@ export default function CommunityPage() {
                                 e.preventDefault();
                                 setAwardOpenId((prev) => (prev === post.id ? null : post.id || null));
                               }}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors text-xs font-semibold"
+                              className="flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-3 py-1 hover:bg-amber-100 hover:border-amber-300 transition-colors"
                             >
                               <Award className="w-4 h-4" />
                               Award
@@ -617,10 +624,15 @@ export default function CommunityPage() {
                             )}
                           </div>
 
-                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-gray-200 hover:border-slate-400 transition-colors">
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                            }}
+                            className="flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1 hover:border-slate-400 transition-colors"
+                          >
                             <Search className="hidden" />
                             Share
-                          </span>
+                          </button>
                         </div>
                       </div>
                     </div>
