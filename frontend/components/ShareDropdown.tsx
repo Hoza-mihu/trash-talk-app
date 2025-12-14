@@ -16,6 +16,7 @@ export default function ShareDropdown({ postId, postTitle, postImageUrl, onCross
   const [embedCode, setEmbedCode] = useState('');
   const [showEmbed, setShowEmbed] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const embedTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -74,6 +75,11 @@ export default function ShareDropdown({ postId, postTitle, postImageUrl, onCross
     const embedHtml = `<iframe src="${embedUrl}" width="720" height="820" style="border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;" loading="lazy" title="Eco-Eco post"></iframe>`;
     setEmbedCode(embedHtml);
     setShowEmbed(true);
+    // Focus and select for quick copy
+    setTimeout(() => {
+      embedTextareaRef.current?.focus();
+      embedTextareaRef.current?.select();
+    }, 50);
   };
 
   const copyEmbedCode = async () => {
@@ -150,22 +156,27 @@ export default function ShareDropdown({ postId, postTitle, postImageUrl, onCross
               </button>
             </div>
           ) : (
-            <div className="p-4 space-y-3 bg-slate-900">
-              <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-white/60 mb-2">
+            <div className="p-4 space-y-4 bg-slate-900">
+              <div className="space-y-2">
+                <label className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-white/70">
                   Embed code
                 </label>
+                <p className="text-xs text-white/60">
+                  Paste this into your site or blog to show the Eco-Eco post preview.
+                </p>
                 <textarea
                   value={embedCode}
                   readOnly
-                  className="w-full p-3 bg-slate-800 border border-slate-700 rounded text-xs font-mono text-white resize-none focus:outline-none focus:ring-1 focus:ring-emerald-400"
-                  rows={3}
+                  ref={embedTextareaRef}
+                  onFocus={(e) => e.target.select()}
+                  className="w-full p-3 bg-slate-800 border border-slate-700 rounded-lg text-[13px] font-mono text-white resize-none focus:outline-none focus:ring-1 focus:ring-emerald-400 shadow-inner"
+                  rows={5}
                 />
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button
                   onClick={copyEmbedCode}
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-emerald-500 text-white text-xs font-semibold rounded-md hover:bg-emerald-600 transition-colors"
+                  className="flex-1 min-w-[140px] flex items-center justify-center gap-2 px-3 py-2 bg-emerald-500 text-white text-xs font-semibold rounded-md hover:bg-emerald-600 transition-colors"
                 >
                   {copied ? (
                     <>
@@ -179,12 +190,21 @@ export default function ShareDropdown({ postId, postTitle, postImageUrl, onCross
                     </>
                   )}
                 </button>
+                <a
+                  href={embedUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex-1 min-w-[140px] flex items-center justify-center gap-2 px-3 py-2 border border-slate-700 text-xs font-semibold rounded-md text-white hover:bg-white/5 transition-colors"
+                >
+                  <Share2 className="w-4 h-4" />
+                  Preview
+                </a>
                 <button
                   onClick={() => {
                     setShowEmbed(false);
                     setIsOpen(false);
                   }}
-                  className="px-3 py-2 border border-slate-700 text-xs font-semibold rounded-md hover:bg-white/5 transition-colors"
+                  className="px-3 py-2 border border-slate-700 text-xs font-semibold rounded-md text-white hover:bg-white/5 transition-colors"
                 >
                   Close
                 </button>
