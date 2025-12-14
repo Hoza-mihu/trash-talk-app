@@ -337,7 +337,8 @@ export async function createCrosspost(
       isTip: originalPost.isTip,
       tags: originalPost.tags,
       crosspostId: originalPost.id || originalPostId,
-      crosspostFrom: originalPost.communityId || null
+      // Use undefined instead of null to satisfy type and Firestore constraints
+      crosspostFrom: originalPost.communityId || undefined
     };
 
     return await createPost(userId, userName, userPhotoUrl, crosspostData);
