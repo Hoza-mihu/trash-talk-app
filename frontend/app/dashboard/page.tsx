@@ -228,6 +228,9 @@ export default function DashboardPage() {
     color: CATEGORY_COLORS[key]
   })).filter((entry) => entry.name === 'E-Waste' || entry.value > 0);
 
+  const totalCo2 = co2ChartData.reduce((sum, entry) => sum + entry.co2, 0);
+  const totalItems = wasteDistributionData.reduce((sum, entry) => sum + entry.value, 0);
+
   const hasCo2Data = co2ChartData.some((entry) => entry.co2 > 0);
   const hasDistributionData = wasteDistributionData.length > 0;
 
@@ -342,10 +345,10 @@ export default function DashboardPage() {
                     />
                     <YAxis tick={{ fill: '#374151' }} tickFormatter={(value) => `${value}kg`} />
                     <Tooltip
-                      formatter={(value: number | string) => [
-                        `${Number(value).toFixed(2)} kg`,
-                        'CO₂ Saved'
-                      ]}
+                      formatter={(value: number | string) => {
+                        const pct = totalCo2 > 0 ? (Number(value) / totalCo2) * 100 : 0;
+                        return [`${Number(value).toFixed(2)} kg (${pct.toFixed(1)}%)`, 'CO₂ Saved'];
+                      }}
                       cursor={{ fill: 'rgba(16, 185, 129, 0.08)' }}
                     />
                     <Bar dataKey="co2" radius={[8, 8, 0, 0]}>
@@ -396,10 +399,10 @@ export default function DashboardPage() {
                       ))}
                     </Pie>
                     <Tooltip
-                      formatter={(value: number | string, name) => [
-                        `${Number(value)} items`,
-                        String(name)
-                      ]}
+                        formatter={(value: number | string, name) => {
+                          const pct = totalItems > 0 ? (Number(value) / totalItems) * 100 : 0;
+                          return [`${Number(value)} items (${pct.toFixed(1)}%)`, String(name)];
+                        }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
