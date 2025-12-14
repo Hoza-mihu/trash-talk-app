@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, MessageSquare, ThumbsUp, ThumbsDown, Leaf, Send, Trash2 } from 'lucide-react';
+import { ArrowLeft, MessageSquare, Leaf, Send, Trash2, ArrowUp, ArrowDown, Award, Sparkles, MapPin, GraduationCap, Globe2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { getPostById, addComment, getCommentsByPostId, voteOnPost, getUserVote, deletePost, getCommunityById, Comment, Community } from '@/lib/community';
 import { getUserProfile } from '@/lib/profile';
@@ -29,6 +29,8 @@ export default function PostDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [userVote, setUserVote] = useState<'upvote' | 'downvote' | null>(null);
   const [showCrosspostModal, setShowCrosspostModal] = useState(false);
+  const [showAwardsMenu, setShowAwardsMenu] = useState(false);
+  const awardsMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (postId) {
@@ -40,6 +42,18 @@ export default function PostDetailPage() {
     }
   }, [postId, user]);
 
+  useEffect(() => {
+    const onClickAway = (e: MouseEvent) => {
+      if (awardsMenuRef.current && !awardsMenuRef.current.contains(e.target as Node)) {
+        setShowAwardsMenu(false);
+      }
+    };
+    if (showAwardsMenu) {
+      document.addEventListener('mousedown', onClickAway);
+    }
+    return () => document.removeEventListener('mousedown', onClickAway);
+  }, [showAwardsMenu]);
+
   const loadUserVote = async () => {
     if (!user) return;
     try {
@@ -48,6 +62,19 @@ export default function PostDetailPage() {
     } catch (error) {
       console.error('Error loading user vote:', error);
     }
+  };
+
+  const awardOptions = [
+    { name: 'Eco Hero', desc: 'Recognize high-impact recycling actions.', icon: <Sparkles className="w-4 h-4 text-emerald-600" /> },
+    { name: 'Clean-Up Champion', desc: 'For organizing or joining cleanups.', icon: <Award className="w-4 h-4 text-amber-500" /> },
+    { name: 'Spotter Award', desc: 'Flagging illegal dumping or hazards.', icon: <MapPin className="w-4 h-4 text-sky-600" /> },
+    { name: 'Educator Award', desc: 'Teaching proper waste practices.', icon: <GraduationCap className="w-4 h-4 text-indigo-500" /> },
+    { name: 'Community Impact', desc: 'Verified real-world sustainability wins.', icon: <Globe2 className="w-4 h-4 text-teal-500" /> },
+  ];
+
+  const handleGiveAward = (awardName: string) => {
+    setShowAwardsMenu(false);
+    alert(`Award submitted: ${awardName}. (Hook this up to your points/award backend.)`);
   };
 
   const loadPost = async () => {
@@ -364,84 +391,117 @@ export default function PostDetailPage() {
       <div className="max-w-4xl mx-auto px-4 py-6">
         {/* Post */}
         <div className="bg-white rounded-lg border border-gray-200 mb-4">
-          <div className="flex gap-3 p-3">
-            {/* Voting */}
-            <div className="flex flex-col items-center gap-1 pt-1">
-              <button
-                onClick={() => handleVote('upvote')}
-                className={`transition-colors text-lg leading-none ${
-                  userVote === 'upvote' 
-                    ? 'text-green-600' 
-                    : 'text-gray-400 hover:text-green-600'
-                }`}
+          <div className="p-3">
+            {/* Header */}
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              {post.isTip && (
+                <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
+                  💡 Tip
+                </span>
+              )}
+              <Link
+                href={`/community/user/${post.authorId}`}
+                className="text-xs text-gray-500 hover:text-green-600 transition-colors font-medium"
               >
-                ▲
-              </button>
-              <span className="font-bold text-xs text-gray-900">{post.upvotes - post.downvotes}</span>
-              <button
-                onClick={() => handleVote('downvote')}
-                className={`transition-colors text-lg leading-none ${
-                  userVote === 'downvote' 
-                    ? 'text-red-600' 
-                    : 'text-gray-400 hover:text-red-600'
-                }`}
-              >
-                ▼
-              </button>
+                u/{post.authorName}
+              </Link>
+              <span className="text-xs text-gray-400">•</span>
+              <span className="text-xs text-gray-500">{formatDate(post.createdAt)}</span>
             </div>
 
-            {/* Content */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                {post.isTip && (
-                  <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
-                    💡 Tip
-                  </span>
-                )}
-                <Link
-                  href={`/community/user/${post.authorId}`}
-                  className="text-xs text-gray-500 hover:text-green-600 transition-colors font-medium"
-                >
-                  u/{post.authorName}
-                </Link>
-                <span className="text-xs text-gray-400">•</span>
-                <span className="text-xs text-gray-500">{formatDate(post.createdAt)}</span>
-              </div>
-              
-              <h1 className="text-lg font-semibold text-gray-900 mb-2">{post.title}</h1>
-              
-              {post.imageUrl && (
-                <img src={post.imageUrl} alt={post.title || 'Post image'} className="w-full rounded-md mb-3 max-h-[600px] object-contain" />
-              )}
-              
-              {post.content && (
-                <div className="text-gray-700 text-sm leading-relaxed whitespace-pre-line mb-3">
-                  {post.content}
-                </div>
-              )}
+            {/* Title */}
+            <h1 className="text-lg font-semibold text-gray-900 mb-3">{post.title}</h1>
 
-              <div className="flex items-center gap-3 text-xs text-gray-500">
-                <span className="flex items-center gap-1 hover:text-green-600 transition-colors cursor-pointer">
-                  <MessageSquare className="w-3 h-3" />
-                  {post.commentCount} comments
-                </span>
-                <ShareDropdown
-                  postId={postId}
-                  postTitle={post.title || 'Untitled'}
-                  postImageUrl={post.imageUrl}
-                  onCrosspostClick={() => setShowCrosspostModal(true)}
-                />
-                {user && (post.authorId === user.uid || (community && community.creatorId === user.uid)) && (
-                  <button
-                    onClick={handleDeletePost}
-                    disabled={deleting}
-                    className="flex items-center gap-1 text-red-600 hover:text-red-700 font-medium disabled:opacity-50 ml-auto"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                    {deleting ? 'Deleting...' : 'Delete Post'}
-                  </button>
+            {/* Media */}
+            {post.imageUrl && (
+              <img src={post.imageUrl} alt={post.title || 'Post image'} className="w-full rounded-md mb-3 max-h-[600px] object-contain" />
+            )}
+
+            {/* Body */}
+            {post.content && (
+              <div className="text-gray-700 text-sm leading-relaxed whitespace-pre-line mb-3">
+                {post.content}
+              </div>
+            )}
+
+            {/* Actions row (like Reddit) */}
+            <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600 border-t border-gray-100 pt-3">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleVote('upvote')}
+                  className={`inline-flex items-center justify-center px-2 py-1 rounded-full border transition-colors ${
+                    userVote === 'upvote'
+                      ? 'border-green-600 text-green-700 bg-green-50'
+                      : 'border-gray-200 hover:border-green-500 hover:text-green-600'
+                  }`}
+                  title="Upvote"
+                >
+                  <ArrowUp className="w-4 h-4" />
+                </button>
+                <span className="font-semibold text-gray-900">{post.upvotes - post.downvotes}</span>
+                <button
+                  onClick={() => handleVote('downvote')}
+                  className={`inline-flex items-center justify-center px-2 py-1 rounded-full border transition-colors ${
+                    userVote === 'downvote'
+                      ? 'border-red-600 text-red-700 bg-red-50'
+                      : 'border-gray-200 hover:border-red-500 hover:text-red-600'
+                  }`}
+                  title="Downvote"
+                >
+                  <ArrowDown className="w-4 h-4" />
+                </button>
+              </div>
+
+              <span className="flex items-center gap-1 hover:text-green-600 transition-colors cursor-pointer">
+                <MessageSquare className="w-4 h-4" />
+                {post.commentCount} comments
+              </span>
+
+              <div className="relative" ref={awardsMenuRef}>
+                <button
+                  onClick={() => setShowAwardsMenu((s) => !s)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors text-xs font-semibold"
+                >
+                  <Award className="w-4 h-4" />
+                  Award
+                </button>
+                {showAwardsMenu && (
+                  <div className="absolute z-50 mt-2 w-72 rounded-lg border border-gray-200 bg-white shadow-xl p-3 space-y-2">
+                    <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Give an award</div>
+                    {awardOptions.map((a) => (
+                      <button
+                        key={a.name}
+                        onClick={() => handleGiveAward(a.name)}
+                        className="w-full text-left flex items-start gap-3 rounded-md px-3 py-2 hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="mt-1">{a.icon}</div>
+                        <div>
+                          <div className="text-sm font-semibold text-gray-900">{a.name}</div>
+                          <div className="text-xs text-gray-500">{a.desc}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
+
+              <ShareDropdown
+                postId={postId}
+                postTitle={post.title || 'Untitled'}
+                postImageUrl={post.imageUrl}
+                onCrosspostClick={() => setShowCrosspostModal(true)}
+              />
+
+              {user && (post.authorId === user.uid || (community && community.creatorId === user.uid)) && (
+                <button
+                  onClick={handleDeletePost}
+                  disabled={deleting}
+                  className="flex items-center gap-1 text-red-600 hover:text-red-700 font-medium disabled:opacity-50 ml-auto"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  {deleting ? 'Deleting...' : 'Delete Post'}
+                </button>
+              )}
             </div>
           </div>
         </div>
