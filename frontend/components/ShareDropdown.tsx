@@ -34,6 +34,10 @@ export default function ShareDropdown({ postId, postTitle, postImageUrl, onCross
     ? `${window.location.origin}/community/post/${postId}`
     : '';
 
+  const embedUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/embed/post/${postId}`
+    : `${process.env.NEXT_PUBLIC_APP_URL || ''}/embed/post/${postId}`;
+
   const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(postUrl);
@@ -67,7 +71,7 @@ export default function ShareDropdown({ postId, postTitle, postImageUrl, onCross
   };
 
   const handleEmbed = () => {
-    const embedHtml = `<iframe src="${postUrl}" width="640" height="480" frameborder="0" allowfullscreen></iframe>`;
+    const embedHtml = `<iframe src="${embedUrl}" width="760" height="900" style="border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;" loading="lazy" title="Eco-Eco post"></iframe>`;
     setEmbedCode(embedHtml);
     setShowEmbed(true);
   };
