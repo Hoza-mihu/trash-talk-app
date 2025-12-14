@@ -605,18 +605,46 @@ export default function CommunityPage() {
 
   const awardOptions = [
     // Eco / sustainability
-    { name: 'Eco Hero', desc: 'Impactful recycling action', icon: <Sparkles className="w-4 h-4 text-emerald-600" /> },
-    { name: 'Clean-Up Champion', desc: 'Cleanup organizer/volunteer', icon: <Award className="w-4 h-4 text-amber-500" /> },
-    { name: 'Spotter Award', desc: 'Reported hazards/dumping', icon: <MapPin className="w-4 h-4 text-sky-600" /> },
-    { name: 'Educator Award', desc: 'Shared guides/tips', icon: <GraduationCap className="w-4 h-4 text-indigo-500" /> },
-    { name: 'Community Impact', desc: 'Verified sustainability win', icon: <Globe className="w-4 h-4 text-teal-500" /> },
+    { name: 'Eco Hero', desc: 'Impactful recycling action', icon: 'sparkles-emerald' },
+    { name: 'Clean-Up Champion', desc: 'Cleanup organizer/volunteer', icon: 'award-amber' },
+    { name: 'Spotter Award', desc: 'Reported hazards/dumping', icon: 'map-sky' },
+    { name: 'Educator Award', desc: 'Shared guides/tips', icon: 'grad-indigo' },
+    { name: 'Community Impact', desc: 'Verified sustainability win', icon: 'globe-teal' },
     // General / Reddit-like
-    { name: 'Helpful', desc: 'Great answer or solution', icon: <Check className="w-4 h-4 text-green-600" /> },
-    { name: 'Insightful', desc: 'Smart or deep take', icon: <Sparkles className="w-4 h-4 text-purple-500" /> },
-    { name: 'Wholesome', desc: 'Kind and supportive', icon: <Heart className="w-4 h-4 text-rose-500" /> },
-    { name: 'Funny', desc: 'Made me laugh', icon: <Smile className="w-4 h-4 text-amber-600" /> },
-    { name: 'Gold', desc: 'Outstanding contribution', icon: <Trophy className="w-4 h-4 text-yellow-500" /> },
+    { name: 'Helpful', desc: 'Great answer or solution', icon: 'check-green' },
+    { name: 'Insightful', desc: 'Smart or deep take', icon: 'sparkles-purple' },
+    { name: 'Wholesome', desc: 'Kind and supportive', icon: 'heart-rose' },
+    { name: 'Funny', desc: 'Made me laugh', icon: 'smile-amber' },
+    { name: 'Gold', desc: 'Outstanding contribution', icon: 'trophy-gold' },
   ];
+
+  const renderAwardIcon = (code: string) => {
+    const color = (cls: string) => cls;
+    switch (code) {
+      case 'sparkles-emerald':
+        return <Sparkles className="w-4 h-4 text-emerald-600" />;
+      case 'award-amber':
+        return <Award className="w-4 h-4 text-amber-500" />;
+      case 'map-sky':
+        return <MapPin className="w-4 h-4 text-sky-600" />;
+      case 'grad-indigo':
+        return <GraduationCap className="w-4 h-4 text-indigo-500" />;
+      case 'globe-teal':
+        return <Globe className="w-4 h-4 text-teal-500" />;
+      case 'check-green':
+        return <Check className="w-4 h-4 text-green-600" />;
+      case 'sparkles-purple':
+        return <Sparkles className="w-4 h-4 text-purple-500" />;
+      case 'heart-rose':
+        return <Heart className="w-4 h-4 text-rose-500" />;
+      case 'smile-amber':
+        return <Smile className="w-4 h-4 text-amber-600" />;
+      case 'trophy-gold':
+        return <Trophy className="w-4 h-4 text-yellow-500" />;
+      default:
+        return <Award className="w-4 h-4 text-gray-500" />;
+    }
+  };
 
   const handleGiveAward = (postId: string, awardName: string) => {
     setAwardOpenId(null);
@@ -1404,7 +1432,7 @@ export default function CommunityPage() {
                                   onClick={(e) => {
                                     e.preventDefault();
                                     setAwardOpenId((prev) => (prev === post.id ? null : post.id || null));
-                                  })}
+                                  }}
                                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors text-xs font-semibold"
                                 >
                                   <Award className="w-4 h-4" />
@@ -1422,7 +1450,7 @@ export default function CommunityPage() {
                                         }}
                                         className="w-full text-left flex items-start gap-3 rounded-md px-3 py-2 hover:bg-gray-50 transition-colors"
                                       >
-                                        <div className="mt-1">{a.icon}</div>
+                                        <div className="mt-1">{renderAwardIcon(a.icon)}</div>
                                         <div>
                                           <div className="text-sm font-semibold text-gray-900">{a.name}</div>
                                           <div className="text-xs text-gray-500">{a.desc}</div>
