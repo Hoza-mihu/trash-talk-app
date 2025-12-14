@@ -13,7 +13,8 @@ import {
   Tooltip,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  type TooltipProps
 } from 'recharts';
 import {
   CATEGORY_COLORS,
@@ -239,6 +240,27 @@ export default function DashboardPage() {
     (key) => key === 'E-Waste' || key !== 'Other' || globalStats.categories.Other.count > 0
   );
 
+  const renderDistributionTooltip = ({ active, payload }: TooltipProps<number, string>) => {
+    if (!active || !payload || !payload.length) return null;
+
+    const entry = payload[0];
+    const name = entry.name ?? (entry.payload as { name?: string })?.name ?? 'Category';
+    const value =
+      (typeof entry.value === 'number' ? entry.value : Number(entry.value)) ||
+      (entry.payload as { value?: number })?.value ||
+      0;
+    const pct = totalItems > 0 ? (Number(value) / totalItems) * 100 : 0;
+
+    return (
+      <div className="rounded-lg bg-white px-3 py-2 shadow-lg border border-gray-100">
+        <p className="text-sm font-semibold text-gray-900">{name}</p>
+        <p className="text-xs text-gray-700">
+          {Number(value)} items ({pct.toFixed(1)}%)
+        </p>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-teal-50 relative overflow-hidden">
       {/* Animated background elements */}
@@ -398,12 +420,7 @@ export default function DashboardPage() {
                         <Cell key={`slice-${entry.name}`} fill={entry.color} stroke="#fff" strokeWidth={2} />
                       ))}
                     </Pie>
-                    <Tooltip
-                        formatter={(value: number | string, name) => {
-                          const pct = totalItems > 0 ? (Number(value) / totalItems) * 100 : 0;
-                          return [`${Number(value)} items (${pct.toFixed(1)}%)`, String(name)];
-                        }}
-                    />
+                    <Tooltip content={renderDistributionTooltip} />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
