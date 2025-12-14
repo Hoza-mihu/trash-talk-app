@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Leaf, Users, Plus, MessageSquare, TrendingUp, Filter, Trash2, Bell, MoreHorizontal, Clock, Flame, Trophy, LayoutGrid, List, Edit2, Image as ImageIcon, X, Star, Bookmark, VolumeX, Rocket, Check, Sparkles, Home, Calendar, Globe, ArrowUp, ArrowDown, Award, MapPin, GraduationCap, Heart, Smile, Sun, Moon } from 'lucide-react';
+import { ArrowLeft, Leaf, Users, Plus, MessageSquare, TrendingUp, Filter, Trash2, Bell, MoreHorizontal, Clock, Flame, Trophy, LayoutGrid, List, Edit2, Image as ImageIcon, X, Star, Bookmark, VolumeX, Rocket, Check, Sparkles, Home, Calendar, Globe, ArrowUp, ArrowDown, Award, MapPin, GraduationCap, Heart, Smile } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import {
   getCommunityById,
@@ -43,6 +43,7 @@ import {
 import { CATEGORY_COLORS } from '@/lib/stats';
 import ShareDropdown from '@/components/ShareDropdown';
 import CrosspostModal from '@/components/CrosspostModal';
+import ThemeToggle from '@/components/ThemeToggle';
 
 type SortOption = 'best' | 'hot' | 'new' | 'top' | 'controversial' | 'old' | 'qa';
 type TopTimeRange = 'all' | 'year' | 'month' | 'week' | 'day';
@@ -88,7 +89,6 @@ export default function CommunityPage() {
   const [showAllAchievements, setShowAllAchievements] = useState(false);
   const [crosspostModalPost, setCrosspostModalPost] = useState<{ id: string; title: string } | null>(null);
   const [awardOpenId, setAwardOpenId] = useState<string | null>(null);
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
   useEffect(() => {
     if (communityId) {
@@ -157,27 +157,6 @@ export default function CommunityPage() {
     setPosts((prev) => sortPostsByOption(prev, sortOption));
   }, [topRange]);
 
-  useEffect(() => {
-    const stored = localStorage.getItem('theme');
-    if (stored === 'dark' || stored === 'light') {
-      setTheme(stored);
-      document.documentElement.setAttribute('data-theme', stored);
-    } else {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const initial = prefersDark ? 'dark' : 'light';
-      setTheme(initial);
-      document.documentElement.setAttribute('data-theme', initial);
-    }
-  }, []);
-
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('theme', theme);
-  }, [theme]);
-
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
-  };
 
   // Reload posts when page becomes visible (e.g., returning from create post)
   useEffect(() => {
@@ -840,22 +819,7 @@ export default function CommunityPage() {
             <span className="text-xl font-bold text-gray-900">Eco-Eco Community</span>
           </Link>
           <div className="flex items-center gap-3">
-            <button
-              onClick={toggleTheme}
-              className="flex items-center gap-1 rounded-md border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              {theme === 'light' ? (
-                <>
-                  <Moon className="w-4 h-4" />
-                  Dark
-                </>
-              ) : (
-                <>
-                  <Sun className="w-4 h-4" />
-                  Light
-                </>
-              )}
-            </button>
+            <ThemeToggle />
             <Link href="/community" className="flex items-center gap-2 text-gray-600 hover:text-green-600 transition-colors">
               <ArrowLeft className="w-5 h-5" />
               <span className="font-medium">Back</span>

@@ -42,18 +42,15 @@ body {
   color: var(--foreground);
 }
 
-[data-theme='dark'] .bg-white {
+[data-theme='dark'] .bg-white,
+[data-theme='dark'] .bg-gray-50,
+[data-theme='dark'] .bg-gray-100 {
   background-color: var(--card) !important;
   color: var(--foreground) !important;
 }
 
-[data-theme='dark'] .bg-gray-50,
-[data-theme='dark'] .bg-gray-100 {
-  background-color: #111827 !important;
-  color: var(--foreground) !important;
-}
-
-[data-theme='dark'] .border-gray-200 {
+[data-theme='dark'] .border-gray-200,
+[data-theme='dark'] .border-gray-100 {
   border-color: var(--card-border) !important;
 }
 
@@ -61,9 +58,11 @@ body {
   color: var(--muted-strong) !important;
 }
 
+[data-theme='dark'] .text-gray-800,
 [data-theme='dark'] .text-gray-700,
 [data-theme='dark'] .text-gray-600,
-[data-theme='dark'] .text-gray-500 {
+[data-theme='dark'] .text-gray-500,
+[data-theme='dark'] .text-gray-400 {
   color: var(--muted) !important;
 }
 
@@ -72,6 +71,18 @@ body {
 [data-theme='dark'] select {
   background-color: #0b1220 !important;
   color: #e5e7eb !important;
+  border-color: var(--card-border) !important;
+}
+
+[data-theme='dark'] .shadow {
+  box-shadow: var(--shadow) !important;
+}
+
+.theme-toggle-fixed {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 50;
 }
 
 @layer utilities {
