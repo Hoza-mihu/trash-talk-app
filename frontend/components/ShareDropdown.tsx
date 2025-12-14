@@ -71,7 +71,7 @@ export default function ShareDropdown({ postId, postTitle, postImageUrl, onCross
   };
 
   const handleEmbed = () => {
-    const embedHtml = `<iframe src="${embedUrl}" width="760" height="900" style="border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;" loading="lazy" title="Eco-Eco post"></iframe>`;
+    const embedHtml = `<iframe src="${embedUrl}" width="720" height="820" style="border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;" loading="lazy" title="Eco-Eco post"></iframe>`;
     setEmbedCode(embedHtml);
     setShowEmbed(true);
   };
