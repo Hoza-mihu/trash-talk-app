@@ -2001,7 +2001,7 @@ export default function CommunityPage() {
                         value={messageText}
                         onChange={(e) => setMessageText(e.target.value)}
                         placeholder="Type your message"
-                        className="w-48 sm:w-64 h-10 border border-gray-300 rounded-md px-3 text-sm text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                        className="w-40 sm:w-56 h-10 border border-gray-300 rounded-md px-3 text-sm text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                       />
                       <select
                         value={messageTarget}
