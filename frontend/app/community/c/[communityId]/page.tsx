@@ -1994,27 +1994,30 @@ export default function CommunityPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <input
-                      value={messageText}
-                      onChange={(e) => setMessageText(e.target.value)}
-                      placeholder="Message admin/mods"
-                      className="flex-1 border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
-                    />
-                    <select
-                      value={messageTarget}
-                      onChange={(e) => setMessageTarget(e.target.value as 'admin' | 'moderators')}
-                      className="border border-gray-200 rounded-md px-2 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
-                    >
-                      <option value="moderators">Mods</option>
-                      <option value="admin">Admin</option>
-                    </select>
-                    <button
-                      onClick={handleSendModeratorMessage}
-                      className="px-3 py-2 rounded-md bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors"
-                    >
-                      Send
-                    </button>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-semibold text-gray-700">Message admin/mods</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        value={messageText}
+                        onChange={(e) => setMessageText(e.target.value)}
+                        placeholder="Type your message"
+                        className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      />
+                      <select
+                        value={messageTarget}
+                        onChange={(e) => setMessageTarget(e.target.value as 'admin' | 'moderators')}
+                        className="border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      >
+                        <option value="moderators">Mods</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                      <button
+                        onClick={handleSendModeratorMessage}
+                        className="px-4 py-2 rounded-md bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors shadow-sm"
+                      >
+                        Send
+                      </button>
+                    </div>
                   </div>
                 </div>
 
