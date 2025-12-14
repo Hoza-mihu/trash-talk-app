@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { MessageSquare, TrendingUp, Plus, Leaf, Filter, Search, Users, Home, Sparkles, ArrowUp, ArrowDown, Award, MapPin, GraduationCap, Globe2, Sparkles as SparkleIcon } from 'lucide-react';
+import { MessageSquare, TrendingUp, Plus, Leaf, Filter, Search, Users, Home, Sparkles, ArrowUp, ArrowDown, Award, MapPin, GraduationCap, Globe2, Sparkles as SparkleIcon, Check, Heart, Smile, Trophy } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { 
   getAllPosts, 
@@ -59,11 +59,18 @@ export default function CommunityPage() {
   };
 
   const awardOptions = [
+    // Eco / sustainability
     { name: 'Eco Hero', desc: 'Impactful recycling action', icon: <SparkleIcon className="w-4 h-4 text-emerald-600" /> },
     { name: 'Clean-Up Champion', desc: 'Cleanup organizer/volunteer', icon: <Award className="w-4 h-4 text-amber-500" /> },
     { name: 'Spotter Award', desc: 'Reported hazards/dumping', icon: <MapPin className="w-4 h-4 text-sky-600" /> },
     { name: 'Educator Award', desc: 'Shared guides/tips', icon: <GraduationCap className="w-4 h-4 text-indigo-500" /> },
     { name: 'Community Impact', desc: 'Verified sustainability win', icon: <Globe2 className="w-4 h-4 text-teal-500" /> },
+    // General / Reddit-like
+    { name: 'Helpful', desc: 'Great answer or solution', icon: <Check className="w-4 h-4 text-green-600" /> },
+    { name: 'Insightful', desc: 'Smart or deep take', icon: <SparkleIcon className="w-4 h-4 text-purple-500" /> },
+    { name: 'Wholesome', desc: 'Kind and supportive', icon: <Heart className="w-4 h-4 text-rose-500" /> },
+    { name: 'Funny', desc: 'Made me laugh', icon: <Smile className="w-4 h-4 text-amber-600" /> },
+    { name: 'Gold', desc: 'Outstanding contribution', icon: <Trophy className="w-4 h-4 text-yellow-500" /> },
   ];
 
   const handleGiveAward = (postId: string, awardName: string) => {

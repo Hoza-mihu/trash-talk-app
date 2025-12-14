@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Leaf, Users, Plus, MessageSquare, TrendingUp, Filter, Trash2, Bell, MoreHorizontal, Clock, Flame, Trophy, LayoutGrid, List, Edit2, Image as ImageIcon, X, Star, Bookmark, VolumeX, Rocket, Check, Sparkles, Home, Calendar, Globe, ArrowUp, ArrowDown, Award } from 'lucide-react';
+import { ArrowLeft, Leaf, Users, Plus, MessageSquare, TrendingUp, Filter, Trash2, Bell, MoreHorizontal, Clock, Flame, Trophy, LayoutGrid, List, Edit2, Image as ImageIcon, X, Star, Bookmark, VolumeX, Rocket, Check, Sparkles, Home, Calendar, Globe, ArrowUp, ArrowDown, Award, MapPin, GraduationCap, Heart, Smile } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import {
   getCommunityById,
@@ -85,6 +85,7 @@ export default function CommunityPage() {
   const [loadingAchievements, setLoadingAchievements] = useState(false);
   const [showAllAchievements, setShowAllAchievements] = useState(false);
   const [crosspostModalPost, setCrosspostModalPost] = useState<{ id: string; title: string } | null>(null);
+  const [awardOpenId, setAwardOpenId] = useState<string | null>(null);
 
   useEffect(() => {
     if (communityId) {
@@ -600,6 +601,26 @@ export default function CommunityPage() {
     if (days === 1) return 'Yesterday';
     if (days < 7) return `${days} days ago`;
     return d.toLocaleDateString();
+  };
+
+  const awardOptions = [
+    // Eco / sustainability
+    { name: 'Eco Hero', desc: 'Impactful recycling action', icon: <Sparkles className="w-4 h-4 text-emerald-600" /> },
+    { name: 'Clean-Up Champion', desc: 'Cleanup organizer/volunteer', icon: <Award className="w-4 h-4 text-amber-500" /> },
+    { name: 'Spotter Award', desc: 'Reported hazards/dumping', icon: <MapPin className="w-4 h-4 text-sky-600" /> },
+    { name: 'Educator Award', desc: 'Shared guides/tips', icon: <GraduationCap className="w-4 h-4 text-indigo-500" /> },
+    { name: 'Community Impact', desc: 'Verified sustainability win', icon: <Globe className="w-4 h-4 text-teal-500" /> },
+    // General / Reddit-like
+    { name: 'Helpful', desc: 'Great answer or solution', icon: <Check className="w-4 h-4 text-green-600" /> },
+    { name: 'Insightful', desc: 'Smart or deep take', icon: <Sparkles className="w-4 h-4 text-purple-500" /> },
+    { name: 'Wholesome', desc: 'Kind and supportive', icon: <Heart className="w-4 h-4 text-rose-500" /> },
+    { name: 'Funny', desc: 'Made me laugh', icon: <Smile className="w-4 h-4 text-amber-600" /> },
+    { name: 'Gold', desc: 'Outstanding contribution', icon: <Trophy className="w-4 h-4 text-yellow-500" /> },
+  ];
+
+  const handleGiveAward = (postId: string, awardName: string) => {
+    setAwardOpenId(null);
+    alert(`Award "${awardName}" sent for post ${postId}. Connect to awards backend.`);
   };
 
   const handleBannerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1378,16 +1399,39 @@ export default function CommunityPage() {
                                 {post.commentCount} comments
                               </span>
 
-                              <button
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  alert('Award sent. Connect this to your awards backend.');
-                                }}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors text-xs font-semibold"
-                              >
-                                <Award className="w-4 h-4" />
-                                Award
-                              </button>
+                              <div className="relative">
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    setAwardOpenId((prev) => (prev === post.id ? null : post.id || null));
+                                  })}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors text-xs font-semibold"
+                                >
+                                  <Award className="w-4 h-4" />
+                                  Award
+                                </button>
+                                {awardOpenId === post.id && (
+                                  <div className="absolute z-50 mt-2 w-72 rounded-lg border border-gray-200 bg-white shadow-xl p-3 space-y-2">
+                                    <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Give an award</div>
+                                    {awardOptions.map((a) => (
+                                      <button
+                                        key={a.name}
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          handleGiveAward(post.id!, a.name);
+                                        }}
+                                        className="w-full text-left flex items-start gap-3 rounded-md px-3 py-2 hover:bg-gray-50 transition-colors"
+                                      >
+                                        <div className="mt-1">{a.icon}</div>
+                                        <div>
+                                          <div className="text-sm font-semibold text-gray-900">{a.name}</div>
+                                          <div className="text-xs text-gray-500">{a.desc}</div>
+                                        </div>
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
 
                               <div onClick={(e) => e.stopPropagation()}>
                                 <ShareDropdown

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, MessageSquare, Leaf, Send, Trash2, ArrowUp, ArrowDown, Award, Sparkles, MapPin, GraduationCap, Globe2 } from 'lucide-react';
+import { ArrowLeft, MessageSquare, Leaf, Send, Trash2, ArrowUp, ArrowDown, Award, Sparkles, MapPin, GraduationCap, Globe2, Check, Heart, Smile, Trophy } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { getPostById, addComment, getCommentsByPostId, voteOnPost, getUserVote, deletePost, getCommunityById, Comment, Community } from '@/lib/community';
 import { getUserProfile } from '@/lib/profile';
@@ -65,11 +65,18 @@ export default function PostDetailPage() {
   };
 
   const awardOptions = [
+    // Eco / sustainability
     { name: 'Eco Hero', desc: 'Recognize high-impact recycling actions.', icon: <Sparkles className="w-4 h-4 text-emerald-600" /> },
     { name: 'Clean-Up Champion', desc: 'For organizing or joining cleanups.', icon: <Award className="w-4 h-4 text-amber-500" /> },
     { name: 'Spotter Award', desc: 'Flagging illegal dumping or hazards.', icon: <MapPin className="w-4 h-4 text-sky-600" /> },
     { name: 'Educator Award', desc: 'Teaching proper waste practices.', icon: <GraduationCap className="w-4 h-4 text-indigo-500" /> },
     { name: 'Community Impact', desc: 'Verified real-world sustainability wins.', icon: <Globe2 className="w-4 h-4 text-teal-500" /> },
+    // General / Reddit-like
+    { name: 'Helpful', desc: 'Great solution or answer.', icon: <Check className="w-4 h-4 text-green-600" /> },
+    { name: 'Insightful', desc: 'Smart take or deep info.', icon: <Sparkles className="w-4 h-4 text-purple-500" /> },
+    { name: 'Wholesome', desc: 'Kind, supportive content.', icon: <Heart className="w-4 h-4 text-rose-500" /> },
+    { name: 'Funny', desc: 'Made you laugh.', icon: <Smile className="w-4 h-4 text-amber-600" /> },
+    { name: 'Gold', desc: 'Top-tier contribution.', icon: <Trophy className="w-4 h-4 text-yellow-500" /> },
   ];
 
   const handleGiveAward = (awardName: string) => {
