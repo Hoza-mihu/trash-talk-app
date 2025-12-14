@@ -2001,19 +2001,19 @@ export default function CommunityPage() {
                         value={messageText}
                         onChange={(e) => setMessageText(e.target.value)}
                         placeholder="Type your message"
-                        className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                        className="flex-1 h-10 border border-gray-300 rounded-md px-3 text-sm text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                       />
                       <select
                         value={messageTarget}
                         onChange={(e) => setMessageTarget(e.target.value as 'admin' | 'moderators')}
-                        className="border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                        className="h-10 border border-gray-300 rounded-md px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                       >
                         <option value="moderators">Mods</option>
                         <option value="admin">Admin</option>
                       </select>
                       <button
                         onClick={handleSendModeratorMessage}
-                        className="px-4 py-2 rounded-md bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors shadow-sm"
+                        className="h-10 px-4 rounded-md bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-colors shadow-sm flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1"
                       >
                         Send
                       </button>
