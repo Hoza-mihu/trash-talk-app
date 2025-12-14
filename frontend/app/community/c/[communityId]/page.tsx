@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Leaf, Users, Plus, MessageSquare, TrendingUp, Filter, Trash2, Bell, MoreHorizontal, Clock, Flame, Trophy, LayoutGrid, List, Edit2, Image as ImageIcon, X, Star, Bookmark, VolumeX, Rocket, Check, Sparkles, Home, Calendar, Globe } from 'lucide-react';
+import { ArrowLeft, Leaf, Users, Plus, MessageSquare, TrendingUp, Filter, Trash2, Bell, MoreHorizontal, Clock, Flame, Trophy, LayoutGrid, List, Edit2, Image as ImageIcon, X, Star, Bookmark, VolumeX, Rocket, Check, Sparkles, Home, Calendar, Globe, ArrowUp, ArrowDown, Award } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import {
   getCommunityById,
@@ -1345,6 +1345,58 @@ export default function CommunityPage() {
                               <span className="flex items-center gap-1 hover:text-green-600 transition-colors cursor-pointer">
                                 Save
                               </span>
+                            </div>
+
+                            {/* Inline action bar similar to Reddit */}
+                            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-gray-600">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    // hook real vote call here if desired
+                                  }}
+                                  className="inline-flex items-center justify-center px-2 py-1 rounded-full border border-gray-200 hover:border-green-500 hover:text-green-600 transition-colors"
+                                  title="Upvote"
+                                >
+                                  <ArrowUp className="w-4 h-4" />
+                                </button>
+                                <span className="font-semibold text-gray-900">{post.upvotes - post.downvotes}</span>
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    // hook real vote call here if desired
+                                  }}
+                                  className="inline-flex items-center justify-center px-2 py-1 rounded-full border border-gray-200 hover:border-red-500 hover:text-red-600 transition-colors"
+                                  title="Downvote"
+                                >
+                                  <ArrowDown className="w-4 h-4" />
+                                </button>
+                              </div>
+
+                              <span className="flex items-center gap-1 px-3 py-1 rounded-full border border-gray-200 hover:border-green-500 hover:text-green-600 transition-colors">
+                                <MessageSquare className="w-4 h-4" />
+                                {post.commentCount} comments
+                              </span>
+
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  alert('Award sent. Connect this to your awards backend.');
+                                }}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors text-xs font-semibold"
+                              >
+                                <Award className="w-4 h-4" />
+                                Award
+                              </button>
+
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <ShareDropdown
+                                  postId={post.id!}
+                                  postTitle={post.title}
+                                  postImageUrl={post.imageUrl}
+                                  onCrosspostClick={() => setCrosspostModalPost({ id: post.id!, title: post.title })}
+                                />
+                              </div>
                             </div>
                           </div>
                         </div>

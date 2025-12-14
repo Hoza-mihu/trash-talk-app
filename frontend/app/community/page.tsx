@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { MessageSquare, TrendingUp, Plus, Leaf, Filter, Search, Users, Home, Sparkles } from 'lucide-react';
+import { MessageSquare, TrendingUp, Plus, Leaf, Filter, Search, Users, Home, Sparkles, ArrowUp, ArrowDown, Award, MapPin, GraduationCap, Globe2, Sparkles as SparkleIcon } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { 
   getAllPosts, 
@@ -32,6 +32,7 @@ export default function CommunityPage() {
   const [selectedCategory, setSelectedCategory] = useState<WasteCategoryKey | 'all'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearching, setIsSearching] = useState(false);
+  const [awardOpenId, setAwardOpenId] = useState<string | null>(null);
 
   useEffect(() => {
     loadCommunities();
@@ -55,6 +56,19 @@ export default function CommunityPage() {
     } finally {
       setCommunitiesLoading(false);
     }
+  };
+
+  const awardOptions = [
+    { name: 'Eco Hero', desc: 'Impactful recycling action', icon: <SparkleIcon className="w-4 h-4 text-emerald-600" /> },
+    { name: 'Clean-Up Champion', desc: 'Cleanup organizer/volunteer', icon: <Award className="w-4 h-4 text-amber-500" /> },
+    { name: 'Spotter Award', desc: 'Reported hazards/dumping', icon: <MapPin className="w-4 h-4 text-sky-600" /> },
+    { name: 'Educator Award', desc: 'Shared guides/tips', icon: <GraduationCap className="w-4 h-4 text-indigo-500" /> },
+    { name: 'Community Impact', desc: 'Verified sustainability win', icon: <Globe2 className="w-4 h-4 text-teal-500" /> },
+  ];
+
+  const handleGiveAward = (postId: string, awardName: string) => {
+    setAwardOpenId(null);
+    alert(`Award "${awardName}" sent for post ${postId}. Connect this to your awards backend.`);
   };
 
   const loadUserCommunities = async () => {
@@ -528,6 +542,77 @@ export default function CommunityPage() {
                           <span className="flex items-center gap-1">
                             <MessageSquare className="w-3 h-3" />
                             {post.commentCount} comments
+                          </span>
+                        </div>
+
+                        {/* Action bar like Reddit */}
+                        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-gray-600">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                // hook actual vote here
+                              }}
+                              className="inline-flex items-center justify-center px-2 py-1 rounded-full border border-gray-200 hover:border-green-500 hover:text-green-600 transition-colors"
+                              title="Upvote"
+                            >
+                              <ArrowUp className="w-4 h-4" />
+                            </button>
+                            <span className="font-semibold text-gray-900">{post.upvotes - post.downvotes}</span>
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                // hook actual vote here
+                              }}
+                              className="inline-flex items-center justify-center px-2 py-1 rounded-full border border-gray-200 hover:border-red-500 hover:text-red-600 transition-colors"
+                              title="Downvote"
+                            >
+                              <ArrowDown className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          <span className="flex items-center gap-1 px-3 py-1 rounded-full border border-gray-200 hover:border-green-500 hover:text-green-600 transition-colors">
+                            <MessageSquare className="w-4 h-4" />
+                            {post.commentCount} comments
+                          </span>
+
+                          <div className="relative">
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setAwardOpenId((prev) => (prev === post.id ? null : post.id || null));
+                              }}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors text-xs font-semibold"
+                            >
+                              <Award className="w-4 h-4" />
+                              Award
+                            </button>
+                            {awardOpenId === post.id && (
+                              <div className="absolute z-50 mt-2 w-72 rounded-lg border border-gray-200 bg-white shadow-xl p-3 space-y-2">
+                                <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Give an award</div>
+                                {awardOptions.map((a) => (
+                                  <button
+                                    key={a.name}
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      handleGiveAward(post.id!, a.name);
+                                    }}
+                                    className="w-full text-left flex items-start gap-3 rounded-md px-3 py-2 hover:bg-gray-50 transition-colors"
+                                  >
+                                    <div className="mt-1">{a.icon}</div>
+                                    <div>
+                                      <div className="text-sm font-semibold text-gray-900">{a.name}</div>
+                                      <div className="text-xs text-gray-500">{a.desc}</div>
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-gray-200 hover:border-slate-400 transition-colors">
+                            <Search className="hidden" />
+                            Share
                           </span>
                         </div>
                       </div>
