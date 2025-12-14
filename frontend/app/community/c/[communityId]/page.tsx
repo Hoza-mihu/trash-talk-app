@@ -44,7 +44,8 @@ import { CATEGORY_COLORS } from '@/lib/stats';
 import ShareDropdown from '@/components/ShareDropdown';
 import CrosspostModal from '@/components/CrosspostModal';
 
-type SortOption = 'best' | 'hot' | 'new' | 'top';
+type SortOption = 'best' | 'hot' | 'new' | 'top' | 'controversial' | 'old' | 'qa';
+type TopTimeRange = 'all' | 'year' | 'month' | 'week' | 'day';
 type ViewOption = 'card' | 'compact';
 
 export default function CommunityPage() {
@@ -61,6 +62,7 @@ export default function CommunityPage() {
   const [deleting, setDeleting] = useState(false);
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
   const [sortOption, setSortOption] = useState<SortOption>('best');
+  const [topRange, setTopRange] = useState<TopTimeRange>('all');
   const [viewOption, setViewOption] = useState<ViewOption>('card');
   const [editingImages, setEditingImages] = useState(false);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
@@ -114,44 +116,31 @@ export default function CommunityPage() {
         });
         
         // Subscribe to real-time posts updates with proper sorting
+        const backendSort: 'best' | 'hot' | 'new' | 'top' = ['best', 'hot', 'new', 'top'].includes(sortOption)
+          ? (sortOption as 'best' | 'hot' | 'new' | 'top')
+          : 'new';
+
         const unsubscribePosts = subscribeToCommunityPosts(
           communityId, 
           (fetchedPosts) => {
-            setPosts(fetchedPosts);
+            const sorted = sortPostsByOption(fetchedPosts, sortOption);
+            setPosts(sorted);
             setLoading(false);
             
             // Update highlights (latest and top posts)
-            const latest = [...fetchedPosts]
-              .sort((a, b) => {
-                const getTime = (date: any): number => {
-                  if (!date) return 0;
-                  if (date.toMillis && typeof date.toMillis === 'function') {
-                    return date.toMillis();
-                  }
-                  if (date instanceof Date) {
-                    return date.getTime();
-                  }
-                  try {
-                    return new Date(date).getTime();
-                  } catch {
-                    return 0;
-                  }
-                };
-                const aTime = getTime(a.createdAt);
-                const bTime = getTime(b.createdAt);
-                return bTime - aTime;
-              })
+            const latest = [...sorted]
+              .sort((a, b) => getTimeValue(b.createdAt) - getTimeValue(a.createdAt))
               .slice(0, 3);
             setLatestPosts(latest);
             
-            const top = [...fetchedPosts]
+            const top = [...sorted]
               .sort((a, b) => (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes))
               .slice(0, 3);
             setTopPosts(top);
             setHighlights(top);
           },
           50,
-          sortOption
+          backendSort
         );
         
         return () => {
@@ -160,7 +149,12 @@ export default function CommunityPage() {
         };
       }
     }
-  }, [communityId, sortOption, user]);
+  }, [communityId, sortOption, topRange, user]);
+
+  useEffect(() => {
+    // Resort locally when time range changes for top
+    setPosts((prev) => sortPostsByOption(prev, sortOption));
+  }, [topRange]);
 
   // Reload posts when page becomes visible (e.g., returning from create post)
   useEffect(() => {
@@ -392,9 +386,12 @@ export default function CommunityPage() {
     setLoading(true);
     try {
       let fetched: CommunityPost[] = [];
+      const backendSort: 'best' | 'hot' | 'new' | 'top' = ['hot', 'top', 'best', 'new'].includes(sortOption)
+        ? (sortOption as 'best' | 'hot' | 'new' | 'top')
+        : 'new';
       
       // Use appropriate function based on sort option
-      switch (sortOption) {
+      switch (backendSort) {
         case 'hot':
           fetched = await getHotPostsByCommunity(communityId, 50);
           break;
@@ -410,33 +407,16 @@ export default function CommunityPage() {
           break;
       }
       
-      setPosts(fetched);
+      const sorted = sortPostsByOption(fetched, sortOption);
+      setPosts(sorted);
       
       // Update highlights (latest and top posts)
-      const latest = [...fetched]
-        .sort((a, b) => {
-          const getTime = (date: any): number => {
-            if (!date) return 0;
-            if (date.toMillis && typeof date.toMillis === 'function') {
-              return date.toMillis();
-            }
-            if (date instanceof Date) {
-              return date.getTime();
-            }
-            try {
-              return new Date(date).getTime();
-            } catch {
-              return 0;
-            }
-          };
-          const aTime = getTime(a.createdAt);
-          const bTime = getTime(b.createdAt);
-          return bTime - aTime;
-        })
+      const latest = [...sorted]
+        .sort((a, b) => getTimeValue(b.createdAt) - getTimeValue(a.createdAt))
         .slice(0, 3);
       setLatestPosts(latest);
       
-      const top = [...fetched]
+      const top = [...sorted]
         .sort((a, b) => (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes))
         .slice(0, 3);
       setTopPosts(top);
@@ -601,6 +581,96 @@ export default function CommunityPage() {
     if (days === 1) return 'Yesterday';
     if (days < 7) return `${days} days ago`;
     return d.toLocaleDateString();
+  };
+
+  const getTimeValue = (date: any): number => {
+    if (!date) return 0;
+    if (date.toMillis && typeof date.toMillis === 'function') {
+      return date.toMillis();
+    }
+    if (date instanceof Date) {
+      return date.getTime();
+    }
+    try {
+      return new Date(date).getTime();
+    } catch {
+      return 0;
+    }
+  };
+
+  const isWithinTopRange = (createdAt: any, range: TopTimeRange): boolean => {
+    if (range === 'all') return true;
+    const created = getTimeValue(createdAt);
+    if (!created) return false;
+    const now = Date.now();
+    const oneDay = 1000 * 60 * 60 * 24;
+    switch (range) {
+      case 'day':
+        return now - created <= oneDay;
+      case 'week':
+        return now - created <= oneDay * 7;
+      case 'month':
+        return now - created <= oneDay * 30;
+      case 'year':
+        return now - created <= oneDay * 365;
+      default:
+        return true;
+    }
+  };
+
+  const calculateBalancedScore = (post: CommunityPost) => {
+    const score = post.upvotes - post.downvotes;
+    const engagement = post.commentCount || 0;
+    const ageHours = Math.max(1, (Date.now() - getTimeValue(post.createdAt)) / (1000 * 60 * 60));
+    // Weight: quality (votes), engagement (comments), freshness (penalize older)
+    return score * 0.6 + engagement * 0.3 + 15 / Math.pow(ageHours + 2, 0.3);
+  };
+
+  const calculateControversialScore = (post: CommunityPost) => {
+    const ups = post.upvotes || 0;
+    const downs = post.downvotes || 0;
+    const total = ups + downs;
+    const disagreement = total - Math.abs(ups - downs);
+    // Reward volume with disagreement, light freshness boost
+    const ageHours = Math.max(1, (Date.now() - getTimeValue(post.createdAt)) / (1000 * 60 * 60));
+    return disagreement * 0.7 + total * 0.2 + 10 / Math.pow(ageHours + 2, 0.5);
+  };
+
+  const calculateQAScore = (post: CommunityPost) => {
+    const isQuestion = post.title?.includes('?') || post.tags?.some((t) => t.toLowerCase?.() === 'question');
+    const helpful = (post.commentCount || 0) * 1.5 + (post.upvotes - post.downvotes) * 0.5;
+    const recencyBonus = 8 / Math.max(1, (Date.now() - getTimeValue(post.createdAt)) / (1000 * 60 * 60 * 24));
+    return (isQuestion ? 10 : 0) + helpful + recencyBonus;
+  };
+
+  const sortPostsByOption = (items: CommunityPost[], option: SortOption): CommunityPost[] => {
+    let working = [...items];
+
+    if (option === 'top' && topRange !== 'all') {
+      working = working.filter((p) => isWithinTopRange(p.createdAt, topRange));
+    }
+
+    switch (option) {
+      case 'best':
+        return working.sort((a, b) => calculateBalancedScore(b) - calculateBalancedScore(a));
+      case 'hot':
+        return working.sort(
+          (a, b) =>
+            (b.hotScore ?? calculateBalancedScore(b)) - (a.hotScore ?? calculateBalancedScore(a))
+        );
+      case 'top':
+        return working.sort((a, b) => (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes));
+      case 'new':
+        return working.sort((a, b) => getTimeValue(b.createdAt) - getTimeValue(a.createdAt));
+      case 'old':
+        return working.sort((a, b) => getTimeValue(a.createdAt) - getTimeValue(b.createdAt));
+      case 'controversial':
+        return working.sort((a, b) => calculateControversialScore(b) - calculateControversialScore(a));
+      case 'qa':
+        return working.sort((a, b) => calculateQAScore(b) - calculateQAScore(a));
+      default:
+        return working;
+    }
   };
 
   const awardOptions = [
@@ -1218,8 +1288,8 @@ export default function CommunityPage() {
             )}
 
             {/* Sort and View Options */}
-            <div className="bg-white rounded-lg border border-gray-200 p-2 flex items-center justify-between">
-              <div className="flex items-center gap-1">
+            <div className="bg-white rounded-lg border border-gray-200 p-2 flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-1 flex-wrap">
                 <button
                   onClick={() => setSortOption('best')}
                   className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -1264,8 +1334,58 @@ export default function CommunityPage() {
                   <Trophy className="w-4 h-4 inline mr-1" />
                   Top
                 </button>
+                <button
+                  onClick={() => setSortOption('controversial')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    sortOption === 'controversial'
+                      ? 'bg-gray-100 text-gray-900'
+                      : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <Flame className="w-4 h-4 inline mr-1" />
+                  Controversial
+                </button>
+                <button
+                  onClick={() => setSortOption('old')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    sortOption === 'old'
+                      ? 'bg-gray-100 text-gray-900'
+                      : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <Clock className="w-4 h-4 inline mr-1 rotate-180" />
+                  Old
+                </button>
+                <button
+                  onClick={() => setSortOption('qa')}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    sortOption === 'qa'
+                      ? 'bg-gray-100 text-gray-900'
+                      : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <MessageSquare className="w-4 h-4 inline mr-1" />
+                  Q&amp;A
+                </button>
               </div>
-              <div className="flex items-center gap-1 border-l border-gray-200 pl-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                {sortOption === 'top' && (
+                  <div className="flex items-center gap-1 text-xs text-gray-600">
+                    <span className="font-medium">Range:</span>
+                    <select
+                      value={topRange}
+                      onChange={(e) => setTopRange(e.target.value as TopTimeRange)}
+                      className="border border-gray-200 rounded-md px-2 py-1 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-green-500"
+                    >
+                      <option value="all">All time</option>
+                      <option value="year">Year</option>
+                      <option value="month">Month</option>
+                      <option value="week">Week</option>
+                      <option value="day">Today</option>
+                    </select>
+                  </div>
+                )}
+                <div className="flex items-center gap-1 border-l border-gray-200 pl-2">
                 <button
                   onClick={() => setViewOption('card')}
                   className={`p-2 rounded-md transition-colors ${
@@ -1288,6 +1408,7 @@ export default function CommunityPage() {
                 >
                   <List className="w-4 h-4" />
                 </button>
+              </div>
               </div>
             </div>
 
