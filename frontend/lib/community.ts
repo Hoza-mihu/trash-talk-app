@@ -175,6 +175,8 @@ export interface CommunityPost {
   updatedAt: Timestamp | Date;
   tags?: string[];
   isTip?: boolean; // Whether this is a recycling tip
+  crosspostId?: string; // ID of the original post if this is a crosspost
+  crosspostFrom?: string; // Community ID where the original post was made
 }
 
 export interface Comment {
@@ -307,6 +309,41 @@ export async function createPost(
     }
     
     throw error;
+  }
+}
+
+// Create a crosspost (share a post to another community)
+export async function createCrosspost(
+  userId: string,
+  userName: string,
+  userPhotoUrl: string | null,
+  originalPostId: string,
+  targetCommunityId: string
+): Promise<string> {
+  try {
+    // Get the original post
+    const originalPost = await getPostById(originalPostId);
+    if (!originalPost) {
+      throw new Error('Original post not found');
+    }
+
+    // Create a new post with crosspost reference
+    const crosspostData = {
+      title: originalPost.title,
+      content: originalPost.content,
+      category: originalPost.category,
+      communityId: targetCommunityId,
+      imageUrl: originalPost.imageUrl,
+      isTip: originalPost.isTip,
+      tags: originalPost.tags,
+      crosspostId: originalPost.id || originalPostId,
+      crosspostFrom: originalPost.communityId || null
+    };
+
+    return await createPost(userId, userName, userPhotoUrl, crosspostData);
+  } catch (error: any) {
+    console.error('Error creating crosspost:', error);
+    throw new Error(`Failed to create crosspost: ${error.message || 'Unknown error'}`);
   }
 }
 

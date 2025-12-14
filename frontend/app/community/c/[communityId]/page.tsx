@@ -41,6 +41,8 @@ import {
   AchievementType
 } from '@/lib/community';
 import { CATEGORY_COLORS } from '@/lib/stats';
+import ShareDropdown from '@/components/ShareDropdown';
+import CrosspostModal from '@/components/CrosspostModal';
 
 type SortOption = 'best' | 'hot' | 'new' | 'top';
 type ViewOption = 'card' | 'compact';
@@ -82,6 +84,7 @@ export default function CommunityPage() {
   const [userAchievements, setUserAchievements] = useState<CommunityAchievement[]>([]);
   const [loadingAchievements, setLoadingAchievements] = useState(false);
   const [showAllAchievements, setShowAllAchievements] = useState(false);
+  const [crosspostModalPost, setCrosspostModalPost] = useState<{ id: string; title: string } | null>(null);
 
   useEffect(() => {
     if (communityId) {
@@ -1331,9 +1334,14 @@ export default function CommunityPage() {
                                 <MessageSquare className="w-3 h-3" />
                                 {post.commentCount} comments
                               </span>
-                              <span className="flex items-center gap-1 hover:text-green-600 transition-colors cursor-pointer">
-                                Share
-                              </span>
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <ShareDropdown
+                                  postId={post.id!}
+                                  postTitle={post.title}
+                                  postImageUrl={post.imageUrl}
+                                  onCrosspostClick={() => setCrosspostModalPost({ id: post.id!, title: post.title })}
+                                />
+                              </div>
                               <span className="flex items-center gap-1 hover:text-green-600 transition-colors cursor-pointer">
                                 Save
                               </span>
@@ -1752,6 +1760,20 @@ export default function CommunityPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Crosspost Modal */}
+      {crosspostModalPost && (
+        <CrosspostModal
+          isOpen={!!crosspostModalPost}
+          onClose={() => setCrosspostModalPost(null)}
+          postId={crosspostModalPost.id}
+          postTitle={crosspostModalPost.title}
+          onSuccess={() => {
+            setCrosspostModalPost(null);
+            // Optionally refresh posts
+          }}
+        />
       )}
     </div>
   );

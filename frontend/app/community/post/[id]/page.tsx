@@ -9,6 +9,8 @@ import { getPostById, addComment, getCommentsByPostId, voteOnPost, getUserVote, 
 import { getUserProfile } from '@/lib/profile';
 import { CommunityPost } from '@/lib/community';
 import { CATEGORY_COLORS } from '@/lib/stats';
+import ShareDropdown from '@/components/ShareDropdown';
+import CrosspostModal from '@/components/CrosspostModal';
 
 export default function PostDetailPage() {
   const params = useParams();
@@ -26,6 +28,7 @@ export default function PostDetailPage() {
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [userVote, setUserVote] = useState<'upvote' | 'downvote' | null>(null);
+  const [showCrosspostModal, setShowCrosspostModal] = useState(false);
 
   useEffect(() => {
     if (postId) {
@@ -422,9 +425,12 @@ export default function PostDetailPage() {
                   <MessageSquare className="w-3 h-3" />
                   {post.commentCount} comments
                 </span>
-                <span className="flex items-center gap-1 hover:text-green-600 transition-colors cursor-pointer">
-                  Share
-                </span>
+                <ShareDropdown
+                  postId={postId}
+                  postTitle={post.title || 'Untitled'}
+                  postImageUrl={post.imageUrl}
+                  onCrosspostClick={() => setShowCrosspostModal(true)}
+                />
                 {user && (post.authorId === user.uid || (community && community.creatorId === user.uid)) && (
                   <button
                     onClick={handleDeletePost}
@@ -439,6 +445,17 @@ export default function PostDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* Crosspost Modal */}
+        <CrosspostModal
+          isOpen={showCrosspostModal}
+          onClose={() => setShowCrosspostModal(false)}
+          postId={postId}
+          postTitle={post.title || 'Untitled'}
+          onSuccess={() => {
+            // Optionally refresh or show success message
+          }}
+        />
 
         {/* Comments Section */}
         <div className="bg-white rounded-lg border border-gray-200">
