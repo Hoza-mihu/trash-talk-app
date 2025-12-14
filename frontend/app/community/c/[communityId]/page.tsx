@@ -1560,32 +1560,7 @@ export default function CommunityPage() {
                             />
                           </div>
                         </div>
-
-                        {canDelete && (
-                          <button
-                            onClick={(e) => handleDeletePost(post.id!, e)}
-                            disabled={deletingPostId === post.id}
-                            className="flex items-center gap-1 text-red-600 hover:text-red-700 text-sm font-semibold disabled:opacity-50"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                            {deletingPostId === post.id ? 'Deleting...' : 'Delete Post'}
-                          </button>
-                        )}
                       </div>
-
-                      {/* Delete button for post author or community creator */}
-                      {canDelete && (
-                        <div className="px-3 pb-3 flex justify-end">
-                          <button
-                            onClick={(e) => handleDeletePost(post.id!, e)}
-                            disabled={deletingPostId === post.id}
-                            className="flex items-center gap-2 text-red-600 hover:text-red-700 text-xs font-medium disabled:opacity-50"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                            {deletingPostId === post.id ? 'Deleting...' : 'Delete Post'}
-                          </button>
-                        </div>
-                      )}
                     </div>
                   );
                 })}
