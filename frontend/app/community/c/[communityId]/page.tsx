@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Leaf, Users, Plus, MessageSquare, TrendingUp, Filter, Trash2, Bell, MoreHorizontal, Clock, Flame, Trophy, LayoutGrid, List, Edit2, Image as ImageIcon, X, Star, Bookmark, VolumeX, Rocket, Check, Sparkles, Home, Calendar, Globe, ArrowUp, ArrowDown, Award, MapPin, GraduationCap, Heart, Smile } from 'lucide-react';
+import { ArrowLeft, Leaf, Users, Plus, MessageSquare, TrendingUp, Filter, Trash2, Bell, MoreHorizontal, Clock, Flame, Trophy, LayoutGrid, List, Edit2, Image as ImageIcon, X, Star, Bookmark, VolumeX, Rocket, Check, Sparkles, Home, Calendar, Globe, ArrowUp, ArrowDown, Award, MapPin, GraduationCap, Heart, Smile, BellRing, EyeOff, Languages, Flag } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import {
   getCommunityById,
@@ -105,6 +105,7 @@ export default function CommunityPage() {
   const [requestMessage, setRequestMessage] = useState('');
   const [messageText, setMessageText] = useState('');
   const [messageTarget, setMessageTarget] = useState<'admin' | 'moderators'>('moderators');
+  const [postMenuOpenId, setPostMenuOpenId] = useState<string | null>(null);
 
   useEffect(() => {
     if (communityId) {
@@ -631,6 +632,36 @@ export default function CommunityPage() {
     } catch (error: any) {
       alert(error.message || 'Failed to send message.');
     }
+  };
+
+  const handleFollowPost = (postId: string) => {
+    console.log('Follow post', postId);
+    alert('You are now following updates on this post.');
+    setPostMenuOpenId(null);
+  };
+
+  const handleSavePost = (postId: string) => {
+    console.log('Save post', postId);
+    alert('Post saved.');
+    setPostMenuOpenId(null);
+  };
+
+  const handleHidePost = (postId: string) => {
+    console.log('Hide post', postId);
+    alert('Post hidden from your feed.');
+    setPostMenuOpenId(null);
+  };
+
+  const handleTranslatePost = (postId: string) => {
+    console.log('Translate post', postId);
+    alert('Translation feature coming soon.');
+    setPostMenuOpenId(null);
+  };
+
+  const handleReportPost = (postId: string) => {
+    console.log('Report post', postId);
+    alert('Post reported. Thank you for your feedback.');
+    setPostMenuOpenId(null);
   };
 
   const handleDeleteCommunity = async () => {
@@ -1809,6 +1840,61 @@ export default function CommunityPage() {
                               postImageUrl={post.imageUrl}
                               onCrosspostClick={() => setCrosspostModalPost({ id: post.id!, title: post.title })}
                             />
+                          </div>
+
+                          <div className="relative">
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setPostMenuOpenId((prev) => (prev === post.id ? null : post.id || null));
+                              }}
+                              className="flex items-center gap-1 rounded-full border border-gray-200 bg-white px-3 py-1 hover:border-gray-300 hover:text-gray-800 transition-colors"
+                              title="More actions"
+                            >
+                              <MoreHorizontal className="w-4 h-4" />
+                            </button>
+                            {postMenuOpenId === post.id && (
+                              <div className="absolute right-0 mt-2 w-56 rounded-lg border border-gray-200 bg-white shadow-xl z-30">
+                                <div className="py-1 text-sm text-gray-800">
+                                  <button
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleFollowPost(post.id!); }}
+                                    className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left"
+                                  >
+                                    <BellRing className="w-4 h-4 text-amber-500" />
+                                    Follow post
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleSavePost(post.id!); }}
+                                    className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left"
+                                  >
+                                    <Bookmark className="w-4 h-4 text-blue-500" />
+                                    Save
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleHidePost(post.id!); }}
+                                    className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left"
+                                  >
+                                    <EyeOff className="w-4 h-4 text-gray-500" />
+                                    Hide
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleTranslatePost(post.id!); }}
+                                    className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left"
+                                  >
+                                    <Languages className="w-4 h-4 text-green-600" />
+                                    View in other languages
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleReportPost(post.id!); }}
+                                    className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left"
+                                  >
+                                    <Flag className="w-4 h-4 text-red-500" />
+                                    Report
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
