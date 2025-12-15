@@ -2518,6 +2518,14 @@ export default function CommunityPage() {
           }}
         />
       )}
+
+      {statusMessage && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <div className="bg-gray-900 text-white text-sm font-medium px-4 py-2 rounded-full shadow-lg">
+            {statusMessage}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
