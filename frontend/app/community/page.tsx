@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { MessageSquare, TrendingUp, Plus, Leaf, Filter, Search, Users, Home, Sparkles, ArrowUp, ArrowDown, Award, MapPin, GraduationCap, Globe2, Sparkles as SparkleIcon, Check, Heart, Smile, Trophy } from 'lucide-react';
+import { MessageSquare, TrendingUp, Plus, Leaf, Filter, Search, Users, Home, Sparkles, ArrowUp, ArrowDown, Award, MapPin, GraduationCap, Globe2, Sparkles as SparkleIcon, Check, Heart, Smile, Trophy, Flame, Clock, LayoutGrid } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { 
   getAllPosts, 
@@ -15,7 +15,8 @@ import {
   getUserCommunities,
   joinCommunity,
   leaveCommunity,
-  isCommunityMember
+  isCommunityMember,
+  getHotPosts
 } from '@/lib/community';
 import { Community } from '@/lib/community';
 import { CATEGORY_KEYS, CATEGORY_COLORS, WasteCategoryKey } from '@/lib/stats';
@@ -28,7 +29,8 @@ export default function CommunityPage() {
   const [userCommunities, setUserCommunities] = useState<Community[]>([]);
   const [loading, setLoading] = useState(true);
   const [communitiesLoading, setCommunitiesLoading] = useState(true);
-  const [sortBy, setSortBy] = useState<'recent' | 'popular' | 'search'>('recent');
+  const [sortOption, setSortOption] = useState<'best' | 'hot' | 'new' | 'top' | 'controversial' | 'old' | 'qa'>('best');
+  const [topRange, setTopRange] = useState<'all' | 'year' | 'month' | 'week' | 'day'>('all');
   const [selectedCategory, setSelectedCategory] = useState<WasteCategoryKey | 'all'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -39,12 +41,12 @@ export default function CommunityPage() {
     if (user) {
       loadUserCommunities();
     }
-    if (sortBy === 'search' && searchTerm.trim()) {
+    if (searchTerm.trim()) {
       handleSearch();
     } else {
       loadPosts();
     }
-  }, [sortBy, selectedCategory, user]);
+  }, [sortOption, selectedCategory, user, topRange]);
 
   const loadCommunities = async () => {
     setCommunitiesLoading(true);
@@ -88,25 +90,125 @@ export default function CommunityPage() {
     }
   };
 
+  const getTimeValue = (date: any): number => {
+    if (!date) return 0;
+    if (date.toMillis && typeof date.toMillis === 'function') {
+      return date.toMillis();
+    }
+    if (date instanceof Date) {
+      return date.getTime();
+    }
+    try {
+      return new Date(date).getTime();
+    } catch {
+      return 0;
+    }
+  };
+
+  const isWithinTopRange = (createdAt: any, range: typeof topRange): boolean => {
+    if (range === 'all') return true;
+    const created = getTimeValue(createdAt);
+    if (!created) return false;
+    const now = Date.now();
+    const oneDay = 1000 * 60 * 60 * 24;
+    switch (range) {
+      case 'day':
+        return now - created <= oneDay;
+      case 'week':
+        return now - created <= oneDay * 7;
+      case 'month':
+        return now - created <= oneDay * 30;
+      case 'year':
+        return now - created <= oneDay * 365;
+      default:
+        return true;
+    }
+  };
+
+  const calculateBalancedScore = (post: CommunityPost) => {
+    const score = post.upvotes - post.downvotes;
+    const engagement = post.commentCount || 0;
+    const ageHours = Math.max(1, (Date.now() - getTimeValue(post.createdAt)) / (1000 * 60 * 60));
+    return score * 0.6 + engagement * 0.3 + 15 / Math.pow(ageHours + 2, 0.3);
+  };
+
+  const calculateControversialScore = (post: CommunityPost) => {
+    const ups = post.upvotes || 0;
+    const downs = post.downvotes || 0;
+    const total = ups + downs;
+    const disagreement = total - Math.abs(ups - downs);
+    const ageHours = Math.max(1, (Date.now() - getTimeValue(post.createdAt)) / (1000 * 60 * 60));
+    return disagreement * 0.7 + total * 0.2 + 10 / Math.pow(ageHours + 2, 0.5);
+  };
+
+  const calculateQAScore = (post: CommunityPost) => {
+    const isQuestion = post.title?.includes('?') || post.tags?.some((t) => t.toLowerCase?.() === 'question');
+    const helpful = (post.commentCount || 0) * 1.5 + (post.upvotes - post.downvotes) * 0.5;
+    const recencyBonus = 8 / Math.max(1, (Date.now() - getTimeValue(post.createdAt)) / (1000 * 60 * 60 * 24));
+    return (isQuestion ? 10 : 0) + helpful + recencyBonus;
+  };
+
+  const sortPostsByOption = (items: CommunityPost[], option: typeof sortOption): CommunityPost[] => {
+    let working = [...items];
+
+    if (option === 'top' && topRange !== 'all') {
+      working = working.filter((p) => isWithinTopRange(p.createdAt, topRange));
+    }
+
+    switch (option) {
+      case 'best':
+        return working.sort((a, b) => calculateBalancedScore(b) - calculateBalancedScore(a));
+      case 'hot':
+        return working.sort(
+          (a, b) =>
+            (b.hotScore ?? calculateBalancedScore(b)) - (a.hotScore ?? calculateBalancedScore(a))
+        );
+      case 'top':
+        return working.sort((a, b) => (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes));
+      case 'new':
+        return working.sort((a, b) => getTimeValue(b.createdAt) - getTimeValue(a.createdAt));
+      case 'old':
+        return working.sort((a, b) => getTimeValue(a.createdAt) - getTimeValue(b.createdAt));
+      case 'controversial':
+        return working.sort((a, b) => calculateControversialScore(b) - calculateControversialScore(a));
+      case 'qa':
+        return working.sort((a, b) => calculateQAScore(b) - calculateQAScore(a));
+      default:
+        return working;
+    }
+  };
+
   const loadPosts = async () => {
     setLoading(true);
     try {
       let fetchedPosts: CommunityPost[] = [];
-      
-      if (sortBy === 'popular') {
-        const result = await getPopularPosts(50);
-        fetchedPosts = result.posts;
-      } else {
-        const result = await getAllPosts(50);
-        fetchedPosts = result.posts;
+
+      const backendSort: 'hot' | 'top' | 'best' | 'new' = ['hot', 'top', 'best', 'new'].includes(sortOption)
+        ? (sortOption as 'hot' | 'top' | 'best' | 'new')
+        : 'new';
+
+      switch (backendSort) {
+        case 'hot':
+          fetchedPosts = (await getHotPosts(50)).posts;
+          break;
+        case 'top':
+          fetchedPosts = (await getPopularPosts(50)).posts;
+          break;
+        case 'best':
+          fetchedPosts = (await getPopularPosts(50)).posts;
+          break;
+        case 'new':
+        default:
+          fetchedPosts = (await getAllPosts(50)).posts;
+          break;
       }
-      
-      // Filter by category if selected
+
       if (selectedCategory !== 'all') {
-        fetchedPosts = fetchedPosts.filter(post => post.category === selectedCategory);
+        fetchedPosts = fetchedPosts.filter((post) => post.category === selectedCategory);
       }
-      
-      setPosts(fetchedPosts);
+
+      const sorted = sortPostsByOption(fetchedPosts, sortOption);
+      setPosts(sorted);
     } catch (error) {
       console.error('Error loading posts:', error);
     } finally {
@@ -116,7 +218,7 @@ export default function CommunityPage() {
 
   const handleSearch = async () => {
     if (!searchTerm.trim()) {
-      setSortBy('recent');
+      setSortOption('best');
       loadPosts();
       return;
     }
@@ -126,13 +228,12 @@ export default function CommunityPage() {
     try {
       const results = await searchPosts(searchTerm, 50);
       
-      // Filter by category if selected
       const filtered = selectedCategory !== 'all' 
         ? results.filter(post => post.category === selectedCategory)
         : results;
       
-      setPosts(filtered);
-      setSortBy('search');
+      const sorted = sortPostsByOption(filtered, sortOption);
+      setPosts(sorted);
     } catch (error) {
       console.error('Error searching posts:', error);
     } finally {
@@ -389,40 +490,90 @@ export default function CommunityPage() {
             </div>
 
             {/* Controls */}
-            <div className="bg-white rounded-xl p-4 shadow-sm">
-              <div className="flex items-center justify-between flex-wrap gap-4">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      setSortBy('recent');
-                      setSearchTerm('');
-                      loadPosts();
-                    }}
-                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                      sortBy === 'recent'
-                        ? 'bg-green-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    Recent
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSortBy('popular');
-                      setSearchTerm('');
-                      loadPosts();
-                    }}
-                    className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
-                      sortBy === 'popular'
-                        ? 'bg-green-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    <TrendingUp className="w-4 h-4" />
-                    Popular
-                  </button>
-                </div>
+            <div className="bg-white rounded-xl p-4 shadow-sm space-y-3">
+              <div className="flex items-center flex-wrap gap-2">
+                <button
+                  onClick={() => { setSortOption('best'); setSearchTerm(''); }}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                    sortOption === 'best' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <TrendingUp className="w-4 h-4" />
+                  Best
+                </button>
+                <button
+                  onClick={() => { setSortOption('hot'); setSearchTerm(''); }}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                    sortOption === 'hot' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <Flame className="w-4 h-4" />
+                  Hot
+                </button>
+                <button
+                  onClick={() => { setSortOption('new'); setSearchTerm(''); }}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                    sortOption === 'new' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <Clock className="w-4 h-4" />
+                  New
+                </button>
+                <button
+                  onClick={() => { setSortOption('top'); setSearchTerm(''); }}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                    sortOption === 'top' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <Trophy className="w-4 h-4" />
+                  Top
+                </button>
+                <button
+                  onClick={() => { setSortOption('controversial'); setSearchTerm(''); }}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                    sortOption === 'controversial' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <Sparkles className="w-4 h-4 rotate-180" />
+                  Controversial
+                </button>
+                <button
+                  onClick={() => { setSortOption('old'); setSearchTerm(''); }}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                    sortOption === 'old' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <LayoutGrid className="w-4 h-4 rotate-180" />
+                  Old
+                </button>
+                <button
+                  onClick={() => { setSortOption('qa'); setSearchTerm(''); }}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
+                    sortOption === 'qa' ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  Q&A
+                </button>
+                {sortOption === 'top' && (
+                  <div className="flex items-center gap-2 text-xs text-gray-600">
+                    <span className="font-medium">Range:</span>
+                    <select
+                      value={topRange}
+                      onChange={(e) => setTopRange(e.target.value as typeof topRange)}
+                      className="border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    >
+                      <option value="all">All time</option>
+                      <option value="year">Year</option>
+                      <option value="month">Month</option>
+                      <option value="week">Week</option>
+                      <option value="day">Today</option>
+                    </select>
+                  </div>
+                )}
+              </div>
 
+              <div className="flex items-center justify-between flex-wrap gap-3">
                 <div className="flex items-center gap-2">
                   <Filter className="w-4 h-4 text-gray-500" />
                   <select
@@ -653,7 +804,7 @@ export default function CommunityPage() {
                 <button
                   onClick={() => {
                     setSearchTerm('');
-                    setSortBy('recent');
+                    setSortOption('best');
                     loadPosts();
                   }}
                   className="text-xs text-green-600 hover:text-green-700 font-medium"
