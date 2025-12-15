@@ -111,6 +111,7 @@ export default function CommunityPage() {
   const [messageTarget, setMessageTarget] = useState<'admin' | 'moderators'>('moderators');
   const [postMenuOpenId, setPostMenuOpenId] = useState<string | null>(null);
   const [postActions, setPostActions] = useState<Record<string, PostAction>>({});
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (communityId) {
@@ -664,7 +665,7 @@ export default function CommunityPage() {
     await setPostAction(user.uid, postId, { communityId, followed: true });
     setPostActions((prev) => ({ ...prev, [postId]: { ...(prev[postId] || { postId }), followed: true } }));
     setPostMenuOpenId(null);
-    alert('You are now following updates on this post.');
+    setStatusMessage('You are now following updates on this post.');
   };
 
   const handleSavePost = async (postId: string) => {
@@ -675,7 +676,7 @@ export default function CommunityPage() {
     await setPostAction(user.uid, postId, { communityId, saved: true });
     setPostActions((prev) => ({ ...prev, [postId]: { ...(prev[postId] || { postId }), saved: true } }));
     setPostMenuOpenId(null);
-    alert('Post saved.');
+    setStatusMessage('Post saved to your list.');
   };
 
   const handleHidePost = async (postId: string) => {
@@ -687,7 +688,7 @@ export default function CommunityPage() {
     setPostActions((prev) => ({ ...prev, [postId]: { ...(prev[postId] || { postId }), hidden: true } }));
     setPosts((prev) => prev.filter((p) => p.id !== postId));
     setPostMenuOpenId(null);
-    alert('Post hidden from your feed.');
+    setStatusMessage('Post hidden from your feed.');
   };
 
   const handleTranslatePost = async (postId: string) => {
@@ -698,7 +699,7 @@ export default function CommunityPage() {
     await setPostAction(user.uid, postId, { communityId, translated: true });
     setPostActions((prev) => ({ ...prev, [postId]: { ...(prev[postId] || { postId }), translated: true } }));
     setPostMenuOpenId(null);
-    alert('Translation feature coming soon.');
+    setStatusMessage('Translation requested (coming soon).');
   };
 
   const handleReportPost = async (postId: string) => {
@@ -708,8 +709,14 @@ export default function CommunityPage() {
     }
     await reportPost(communityId, postId, user.uid, 'User report');
     setPostMenuOpenId(null);
-    alert('Post reported. Thank you for your feedback.');
+    setStatusMessage('Post reported. Thanks for your feedback.');
   };
+
+  useEffect(() => {
+    if (!statusMessage) return;
+    const timer = setTimeout(() => setStatusMessage(null), 2500);
+    return () => clearTimeout(timer);
+  }, [statusMessage]);
 
   const handleDeleteCommunity = async () => {
     if (!user || !community) return;
@@ -998,6 +1005,13 @@ export default function CommunityPage() {
           <div className="animate-spin w-12 h-12 border-4 border-green-600 border-t-transparent rounded-full mx-auto mb-4"></div>
           <p className="text-gray-600">Loading community...</p>
         </div>
+      {statusMessage && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <div className="bg-gray-900 text-white text-sm font-medium px-4 py-2 rounded-full shadow-lg">
+            {statusMessage}
+          </div>
+        </div>
+      )}
       </div>
     );
   }
