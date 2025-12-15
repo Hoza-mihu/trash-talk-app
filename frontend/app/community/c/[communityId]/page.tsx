@@ -133,9 +133,9 @@ export default function CommunityPage() {
         });
         
         // Subscribe to real-time posts updates with proper sorting
-        const backendSort: 'best' | 'hot' | 'new' | 'top' = ['best', 'hot', 'new', 'top'].includes(sortOption)
-          ? (sortOption as 'best' | 'hot' | 'new' | 'top')
-          : 'new';
+        // Only pass backend-supported sorts; rest will be sorted client-side
+        const backendSort: 'hot' | 'top' | 'new' =
+          sortOption === 'hot' ? 'hot' : sortOption === 'top' ? 'top' : 'new';
 
         const unsubscribePosts = subscribeToCommunityPosts(
           communityId, 
