@@ -136,7 +136,7 @@ export default function CommunityPage() {
       (fetchedPosts) => {
         const sorted = sortPostsByOption(fetchedPosts, sortOption);
         setPosts(sorted);
-        setLoading(false); // subscription delivers fresh data
+        if (!cancelled) setLoading(false); // subscription delivers fresh data
         
         const latest = [...sorted]
           .sort((a, b) => getTimeValue(b.createdAt) - getTimeValue(a.createdAt))
