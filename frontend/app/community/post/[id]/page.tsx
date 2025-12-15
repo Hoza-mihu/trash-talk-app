@@ -3,9 +3,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, MessageSquare, Leaf, Send, Trash2, ArrowUp, ArrowDown, Award, Sparkles, MapPin, GraduationCap, Globe2, Check, Heart, Smile, Trophy } from 'lucide-react';
+import { ArrowLeft, MessageSquare, Leaf, Send, Trash2, ArrowUp, ArrowDown, Award, Sparkles, MapPin, GraduationCap, Globe2, Check, Heart, Smile, Trophy, MoreHorizontal, BellRing, Bookmark, EyeOff, Languages, Flag } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { getPostById, addComment, getCommentsByPostId, voteOnPost, getUserVote, deletePost, getCommunityById, Comment, Community } from '@/lib/community';
+import { getPostById, addComment, getCommentsByPostId, voteOnPost, getUserVote, deletePost, getCommunityById, Comment, Community, getUserPostActionsForCommunity, setPostAction, reportPost, PostAction } from '@/lib/community';
 import { getUserProfile } from '@/lib/profile';
 import { CommunityPost } from '@/lib/community';
 import { CATEGORY_COLORS } from '@/lib/stats';
@@ -31,6 +31,8 @@ export default function PostDetailPage() {
   const [showCrosspostModal, setShowCrosspostModal] = useState(false);
   const [showAwardsMenu, setShowAwardsMenu] = useState(false);
   const awardsMenuRef = useRef<HTMLDivElement>(null);
+  const [postAction, setPostActionState] = useState<PostAction | null>(null);
+  const [actionMenuOpen, setActionMenuOpen] = useState(false);
 
   useEffect(() => {
     if (postId) {
@@ -41,6 +43,24 @@ export default function PostDetailPage() {
       }
     }
   }, [postId, user]);
+
+  useEffect(() => {
+    const onClickAway = (e: MouseEvent) => {
+      if (awardsMenuRef.current && !awardsMenuRef.current.contains(e.target as Node)) {
+        setShowAwardsMenu(false);
+      }
+      if (actionMenuOpen) {
+        const target = e.target as HTMLElement;
+        if (!target.closest('.post-actions-menu')) {
+          setActionMenuOpen(false);
+        }
+      }
+    };
+    if (showAwardsMenu || actionMenuOpen) {
+      document.addEventListener('mousedown', onClickAway);
+    }
+    return () => document.removeEventListener('mousedown', onClickAway);
+  }, [showAwardsMenu, actionMenuOpen]);
 
   useEffect(() => {
     const onClickAway = (e: MouseEvent) => {
@@ -94,6 +114,7 @@ export default function PostDetailPage() {
         try {
           const communityData = await getCommunityById(fetchedPost.communityId);
           setCommunity(communityData);
+          await loadPostAction(fetchedPost.communityId);
         } catch (error) {
           console.error('Error loading community:', error);
         }
@@ -182,6 +203,20 @@ export default function PostDetailPage() {
     }
   };
 
+  const loadPostAction = async (communityId?: string) => {
+    if (!user || !communityId) return;
+    try {
+      const actions = await getUserPostActionsForCommunity(user.uid, communityId);
+      const match = actions.find((a) => a.postId === postId);
+      setPostActionState(match || null);
+      if (match?.hidden) {
+        router.push('/community');
+      }
+    } catch (error) {
+      console.error('Error loading post action:', error);
+    }
+  };
+
   const handleVote = async (type: 'upvote' | 'downvote') => {
     if (!user) {
       router.push('/auth');
@@ -195,6 +230,60 @@ export default function PostDetailPage() {
     } catch (error) {
       console.error('Error voting:', error);
     }
+  };
+
+  const handleFollowPost = async () => {
+    if (!user || !community) {
+      alert('Please sign in to follow posts.');
+      return;
+    }
+    await setPostAction(user.uid, postId, { communityId: community.id, followed: true });
+    setPostActionState((prev) => ({ ...(prev || { postId }), postId, communityId: community.id, followed: true, updatedAt: new Date() }));
+    setActionMenuOpen(false);
+    alert('You are now following updates on this post.');
+  };
+
+  const handleSavePost = async () => {
+    if (!user || !community) {
+      alert('Please sign in to save posts.');
+      return;
+    }
+    await setPostAction(user.uid, postId, { communityId: community.id, saved: true });
+    setPostActionState((prev) => ({ ...(prev || { postId }), postId, communityId: community.id, saved: true, updatedAt: new Date() }));
+    setActionMenuOpen(false);
+    alert('Post saved.');
+  };
+
+  const handleHidePost = async () => {
+    if (!user || !community) {
+      alert('Please sign in to hide posts.');
+      return;
+    }
+    await setPostAction(user.uid, postId, { communityId: community.id, hidden: true });
+    setPostActionState((prev) => ({ ...(prev || { postId }), postId, communityId: community.id, hidden: true, updatedAt: new Date() }));
+    setActionMenuOpen(false);
+    router.push('/community');
+  };
+
+  const handleTranslatePost = async () => {
+    if (!user || !community) {
+      alert('Please sign in to translate posts.');
+      return;
+    }
+    await setPostAction(user.uid, postId, { communityId: community.id, translated: true });
+    setPostActionState((prev) => ({ ...(prev || { postId }), postId, communityId: community.id, translated: true, updatedAt: new Date() }));
+    setActionMenuOpen(false);
+    alert('Translation feature coming soon.');
+  };
+
+  const handleReportPost = async () => {
+    if (!user || !community || !community.id) {
+      alert('Please sign in to report posts.');
+      return;
+    }
+    await reportPost(community.id, postId, user.uid, 'User report');
+    setActionMenuOpen(false);
+    alert('Post reported. Thank you for your feedback.');
   };
 
   const handleDeletePost = async () => {
@@ -498,6 +587,59 @@ export default function PostDetailPage() {
                 postImageUrl={post.imageUrl}
                 onCrosspostClick={() => setShowCrosspostModal(true)}
               />
+
+              <div className="relative post-actions-menu">
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setActionMenuOpen((prev) => !prev);
+                  }}
+                  className="flex items-center gap-1 rounded-full border border-gray-200 bg-white px-3 py-1 hover:border-gray-300 hover:text-gray-800 transition-colors"
+                >
+                  <MoreHorizontal className="w-4 h-4" />
+                </button>
+                {actionMenuOpen && (
+                  <div className="absolute right-0 mt-2 w-56 rounded-lg border border-gray-200 bg-white shadow-xl z-30">
+                    <div className="py-1 text-sm text-gray-800">
+                      <button
+                        onClick={(e) => { e.preventDefault(); handleFollowPost(); }}
+                        className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left"
+                      >
+                        <BellRing className="w-4 h-4 text-amber-500" />
+                        Follow post
+                      </button>
+                      <button
+                        onClick={(e) => { e.preventDefault(); handleSavePost(); }}
+                        className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left"
+                      >
+                        <Bookmark className="w-4 h-4 text-blue-500" />
+                        Save
+                      </button>
+                      <button
+                        onClick={(e) => { e.preventDefault(); handleHidePost(); }}
+                        className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left"
+                      >
+                        <EyeOff className="w-4 h-4 text-gray-500" />
+                        Hide
+                      </button>
+                      <button
+                        onClick={(e) => { e.preventDefault(); handleTranslatePost(); }}
+                        className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left"
+                      >
+                        <Languages className="w-4 h-4 text-green-600" />
+                        View in other languages
+                      </button>
+                      <button
+                        onClick={(e) => { e.preventDefault(); handleReportPost(); }}
+                        className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left"
+                      >
+                        <Flag className="w-4 h-4 text-red-500" />
+                        Report
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {user && (post.authorId === user.uid || (community && community.creatorId === user.uid)) && (
                 <button
