@@ -116,56 +116,56 @@ export default function CommunityPage() {
   }, [communityId, user]);
 
   useEffect(() => {
-    if (communityId) {
-      loadPosts();
-      loadHighlights();
-      // Load favorites and muted status from localStorage
-      if (user) {
-        const favorites = JSON.parse(localStorage.getItem('favoriteCommunities') || '[]');
-        const muted = JSON.parse(localStorage.getItem('mutedCommunities') || '[]');
-        setIsFavorite(favorites.includes(communityId));
-        setIsMuted(muted.includes(communityId));
-        loadNotifications();
-        // Subscribe to real-time notifications
-        const unsubscribeNotifications = subscribeToNotifications(user.uid, (notifs) => {
-          setNotifications(notifs);
-          setUnreadCount(notifs.filter(n => !n.read).length);
-        });
-        
-        // Subscribe to real-time posts updates with proper sorting
-        // Only pass backend-supported sorts; rest will be sorted client-side
-        const backendSort: 'hot' | 'top' | 'new' =
-          sortOption === 'hot' ? 'hot' : sortOption === 'top' ? 'top' : 'new';
+    if (!communityId) return;
 
-        const unsubscribePosts = subscribeToCommunityPosts(
-          communityId, 
-          (fetchedPosts) => {
-            const sorted = sortPostsByOption(fetchedPosts, sortOption);
-            setPosts(sorted);
-            setLoading(false);
-            
-            // Update highlights (latest and top posts)
-            const latest = [...sorted]
-              .sort((a, b) => getTimeValue(b.createdAt) - getTimeValue(a.createdAt))
-              .slice(0, 3);
-            setLatestPosts(latest);
-            
-            const top = [...sorted]
-              .sort((a, b) => (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes))
-              .slice(0, 3);
-            setTopPosts(top);
-            setHighlights(top);
-          },
-          50,
-          backendSort
-        );
+    loadPosts();
+    loadHighlights();
+
+    // Always subscribe to posts (even when not logged in)
+    setLoading(true);
+    const backendSort: 'hot' | 'top' | 'new' =
+      sortOption === 'hot' ? 'hot' : sortOption === 'top' ? 'top' : 'new';
+
+    const unsubscribePosts = subscribeToCommunityPosts(
+      communityId, 
+      (fetchedPosts) => {
+        const sorted = sortPostsByOption(fetchedPosts, sortOption);
+        setPosts(sorted);
+        setLoading(false);
         
-        return () => {
-          unsubscribeNotifications();
-          unsubscribePosts();
-        };
-      }
+        const latest = [...sorted]
+          .sort((a, b) => getTimeValue(b.createdAt) - getTimeValue(a.createdAt))
+          .slice(0, 3);
+        setLatestPosts(latest);
+        
+        const top = [...sorted]
+          .sort((a, b) => (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes))
+          .slice(0, 3);
+        setTopPosts(top);
+        setHighlights(top);
+      },
+      50,
+      backendSort
+    );
+
+    let unsubscribeNotifications: (() => void) | undefined;
+
+    if (user) {
+      const favorites = JSON.parse(localStorage.getItem('favoriteCommunities') || '[]');
+      const muted = JSON.parse(localStorage.getItem('mutedCommunities') || '[]');
+      setIsFavorite(favorites.includes(communityId));
+      setIsMuted(muted.includes(communityId));
+      loadNotifications();
+      unsubscribeNotifications = subscribeToNotifications(user.uid, (notifs) => {
+        setNotifications(notifs);
+        setUnreadCount(notifs.filter(n => !n.read).length);
+      });
     }
+    
+    return () => {
+      unsubscribePosts();
+      if (unsubscribeNotifications) unsubscribeNotifications();
+    };
   }, [communityId, sortOption, topRange, user]);
 
   useEffect(() => {
