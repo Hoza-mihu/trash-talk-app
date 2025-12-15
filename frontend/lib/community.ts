@@ -219,6 +219,16 @@ export interface ModRequest {
   createdAt: Timestamp | Date;
 }
 
+export interface PostAction {
+  postId: string;
+  communityId?: string;
+  followed?: boolean;
+  saved?: boolean;
+  hidden?: boolean;
+  translated?: boolean;
+  updatedAt: Timestamp | Date;
+}
+
 export interface Notification {
   id?: string;
   userId: string;
@@ -1292,6 +1302,61 @@ export async function sendModeratorMessage(
     console.error('Error sending moderator message:', error);
     throw error;
   }
+}
+
+// User post actions (follow/save/hide/translate/report)
+export async function setPostAction(
+  userId: string,
+  postId: string,
+  action: Partial<Omit<PostAction, 'postId' | 'updatedAt'>> & { communityId?: string }
+) {
+  if (!userId || !postId) throw new Error('userId and postId are required');
+  const docRef = doc(db, 'users', userId, 'postActions', postId);
+  await setDoc(
+    docRef,
+    {
+      postId,
+      communityId: action.communityId || null,
+      followed: action.followed ?? false,
+      saved: action.saved ?? false,
+      hidden: action.hidden ?? false,
+      translated: action.translated ?? false,
+      updatedAt: serverTimestamp()
+    },
+    { merge: true }
+  );
+}
+
+export async function getUserPostActionsForCommunity(userId: string, communityId: string): Promise<PostAction[]> {
+  if (!userId || !communityId) return [];
+  const q = query(
+    collection(db, 'users', userId, 'postActions'),
+    where('communityId', '==', communityId)
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => {
+    const data = d.data() as PostAction;
+    return {
+      ...data,
+      postId: data.postId || d.id
+    };
+  });
+}
+
+export async function reportPost(
+  communityId: string,
+  postId: string,
+  reporterId: string,
+  reason: string
+) {
+  if (!communityId || !postId || !reporterId) throw new Error('communityId, postId, reporterId are required');
+  const reportsRef = collection(db, 'communities', communityId, 'postReports');
+  await addDoc(reportsRef, {
+    postId,
+    reporterId,
+    reason,
+    createdAt: serverTimestamp()
+  });
 }
 
 // Get all communities

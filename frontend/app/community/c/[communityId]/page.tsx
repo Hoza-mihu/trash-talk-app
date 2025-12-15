@@ -47,7 +47,11 @@ import {
   removeModerator,
   sendModeratorMessage,
   Moderator,
-  ModRequest
+  ModRequest,
+  setPostAction,
+  getUserPostActionsForCommunity,
+  reportPost,
+  PostAction
 } from '@/lib/community';
 import { CATEGORY_COLORS } from '@/lib/stats';
 import ShareDropdown from '@/components/ShareDropdown';
@@ -106,6 +110,7 @@ export default function CommunityPage() {
   const [messageText, setMessageText] = useState('');
   const [messageTarget, setMessageTarget] = useState<'admin' | 'moderators'>('moderators');
   const [postMenuOpenId, setPostMenuOpenId] = useState<string | null>(null);
+  const [postActions, setPostActions] = useState<Record<string, PostAction>>({});
 
   useEffect(() => {
     if (communityId) {
@@ -136,7 +141,8 @@ export default function CommunityPage() {
       communityId, 
       (fetchedPosts) => {
         const sorted = sortPostsByOption(fetchedPosts, sortOption);
-        setPosts(sorted);
+        const filtered = user ? sorted.filter((p) => !(postActions[p.id!]?.hidden)) : sorted;
+        setPosts(filtered);
         if (!cancelled) setLoading(false); // subscription delivers fresh data
         
         const latest = [...sorted]
@@ -166,6 +172,7 @@ export default function CommunityPage() {
         setNotifications(notifs);
         setUnreadCount(notifs.filter(n => !n.read).length);
       });
+      loadPostActions();
     }
     
     return () => {
@@ -173,7 +180,7 @@ export default function CommunityPage() {
       unsubscribePosts();
       if (unsubscribeNotifications) unsubscribeNotifications();
     };
-  }, [communityId, sortOption, topRange, user]);
+  }, [communityId, sortOption, topRange, user, postActions]);
 
   useEffect(() => {
     // Resort locally when time range changes for top
@@ -315,6 +322,20 @@ export default function CommunityPage() {
       setPopularCommunities(fetched);
     } catch (error) {
       console.error('Error loading popular communities:', error);
+    }
+  };
+
+  const loadPostActions = async () => {
+    if (!user || !communityId) return;
+    try {
+      const actions = await getUserPostActionsForCommunity(user.uid, communityId);
+      const map: Record<string, PostAction> = {};
+      actions.forEach((a) => {
+        map[a.postId] = a;
+      });
+      setPostActions(map);
+    } catch (error) {
+      console.error('Error loading post actions:', error);
     }
   };
 
@@ -470,7 +491,8 @@ export default function CommunityPage() {
       }
       
       const sorted = sortPostsByOption(fetched, sortOption);
-      setPosts(sorted);
+      const filtered = user ? sorted.filter((p) => !(postActions[p.id!]?.hidden)) : sorted;
+      setPosts(filtered);
       
       // Update highlights (latest and top posts)
       const latest = [...sorted]
@@ -634,34 +656,59 @@ export default function CommunityPage() {
     }
   };
 
-  const handleFollowPost = (postId: string) => {
-    console.log('Follow post', postId);
+  const handleFollowPost = async (postId: string) => {
+    if (!user || !communityId) {
+      alert('Please sign in to follow posts.');
+      return;
+    }
+    await setPostAction(user.uid, postId, { communityId, followed: true });
+    setPostActions((prev) => ({ ...prev, [postId]: { ...(prev[postId] || { postId }), followed: true } }));
+    setPostMenuOpenId(null);
     alert('You are now following updates on this post.');
-    setPostMenuOpenId(null);
   };
 
-  const handleSavePost = (postId: string) => {
-    console.log('Save post', postId);
+  const handleSavePost = async (postId: string) => {
+    if (!user || !communityId) {
+      alert('Please sign in to save posts.');
+      return;
+    }
+    await setPostAction(user.uid, postId, { communityId, saved: true });
+    setPostActions((prev) => ({ ...prev, [postId]: { ...(prev[postId] || { postId }), saved: true } }));
+    setPostMenuOpenId(null);
     alert('Post saved.');
-    setPostMenuOpenId(null);
   };
 
-  const handleHidePost = (postId: string) => {
-    console.log('Hide post', postId);
+  const handleHidePost = async (postId: string) => {
+    if (!user || !communityId) {
+      alert('Please sign in to hide posts.');
+      return;
+    }
+    await setPostAction(user.uid, postId, { communityId, hidden: true });
+    setPostActions((prev) => ({ ...prev, [postId]: { ...(prev[postId] || { postId }), hidden: true } }));
+    setPosts((prev) => prev.filter((p) => p.id !== postId));
+    setPostMenuOpenId(null);
     alert('Post hidden from your feed.');
-    setPostMenuOpenId(null);
   };
 
-  const handleTranslatePost = (postId: string) => {
-    console.log('Translate post', postId);
+  const handleTranslatePost = async (postId: string) => {
+    if (!user || !communityId) {
+      alert('Please sign in to translate posts.');
+      return;
+    }
+    await setPostAction(user.uid, postId, { communityId, translated: true });
+    setPostActions((prev) => ({ ...prev, [postId]: { ...(prev[postId] || { postId }), translated: true } }));
+    setPostMenuOpenId(null);
     alert('Translation feature coming soon.');
-    setPostMenuOpenId(null);
   };
 
-  const handleReportPost = (postId: string) => {
-    console.log('Report post', postId);
-    alert('Post reported. Thank you for your feedback.');
+  const handleReportPost = async (postId: string) => {
+    if (!user || !communityId) {
+      alert('Please sign in to report posts.');
+      return;
+    }
+    await reportPost(communityId, postId, user.uid, 'User report');
     setPostMenuOpenId(null);
+    alert('Post reported. Thank you for your feedback.');
   };
 
   const handleDeleteCommunity = async () => {
