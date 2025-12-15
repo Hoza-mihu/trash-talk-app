@@ -117,12 +117,17 @@ export default function CommunityPage() {
 
   useEffect(() => {
     if (!communityId) return;
+    let cancelled = false;
 
-    loadPosts();
-    loadHighlights();
+    const init = async () => {
+      setLoading(true);
+      await Promise.all([loadPosts(), loadHighlights()]);
+      if (!cancelled) setLoading(false);
+    };
+
+    init();
 
     // Always subscribe to posts (even when not logged in)
-    setLoading(true);
     const backendSort: 'hot' | 'top' | 'new' =
       sortOption === 'hot' ? 'hot' : sortOption === 'top' ? 'top' : 'new';
 
@@ -131,7 +136,7 @@ export default function CommunityPage() {
       (fetchedPosts) => {
         const sorted = sortPostsByOption(fetchedPosts, sortOption);
         setPosts(sorted);
-        setLoading(false);
+        setLoading(false); // subscription delivers fresh data
         
         const latest = [...sorted]
           .sort((a, b) => getTimeValue(b.createdAt) - getTimeValue(a.createdAt))
@@ -163,6 +168,7 @@ export default function CommunityPage() {
     }
     
     return () => {
+      cancelled = true;
       unsubscribePosts();
       if (unsubscribeNotifications) unsubscribeNotifications();
     };
@@ -2368,4 +2374,3 @@ export default function CommunityPage() {
     </div>
   );
 }
-
