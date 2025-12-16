@@ -21,8 +21,9 @@ import {
   Unsubscribe,
   startAfter
 } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { db, storage } from './firebase';
+import { db, storage, functions } from './firebase';
 import { WasteCategoryKey } from './stats';
 
 /**
@@ -227,6 +228,14 @@ export interface PostAction {
   hidden?: boolean;
   translated?: boolean;
   updatedAt: Timestamp | Date;
+}
+
+export interface PostTranslation {
+  postId: string;
+  lang: string;
+  title?: string;
+  content?: string;
+  createdAt: Timestamp | Date;
 }
 
 export interface Notification {
@@ -1341,6 +1350,55 @@ export async function getUserPostActionsForCommunity(userId: string, communityId
       postId: data.postId || d.id
     };
   });
+}
+
+// Translation helpers
+export async function getPostTranslation(postId: string, lang: string): Promise<PostTranslation | null> {
+  try {
+    const refDoc = doc(db, 'posts', postId, 'translations', lang);
+    const snap = await getDoc(refDoc);
+    if (!snap.exists()) return null;
+    const data = snap.data() as PostTranslation;
+    return { ...data, postId, lang };
+  } catch (error) {
+    console.error('Error getting translation:', error);
+    return null;
+  }
+}
+
+export async function translatePostContent(
+  postId: string,
+  targetLang: string,
+  payload: { title?: string; content?: string }
+): Promise<PostTranslation> {
+  // Check cache
+  const cached = await getPostTranslation(postId, targetLang);
+  if (cached) return cached;
+
+  try {
+    const translateFn = httpsCallable(functions, 'translatePost');
+    const result = await translateFn({
+      postId,
+      targetLang,
+      title: payload.title || '',
+      content: payload.content || ''
+    });
+    const translated = result.data as { title?: string; content?: string };
+
+    const refDoc = doc(db, 'posts', postId, 'translations', targetLang);
+    const record: PostTranslation = {
+      postId,
+      lang: targetLang,
+      title: translated.title || '',
+      content: translated.content || '',
+      createdAt: serverTimestamp() as any
+    };
+    await setDoc(refDoc, record);
+    return { ...record, createdAt: new Date() };
+  } catch (error) {
+    console.error('Error translating post:', error);
+    throw error;
+  }
 }
 
 export async function reportPost(

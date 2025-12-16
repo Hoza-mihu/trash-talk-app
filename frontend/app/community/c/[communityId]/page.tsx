@@ -51,7 +51,8 @@ import {
   setPostAction,
   getUserPostActionsForCommunity,
   reportPost,
-  PostAction
+  PostAction,
+  translatePostContent
 } from '@/lib/community';
 import { CATEGORY_COLORS } from '@/lib/stats';
 import ShareDropdown from '@/components/ShareDropdown';
@@ -662,10 +663,11 @@ export default function CommunityPage() {
       alert('Please sign in to follow posts.');
       return;
     }
-    await setPostAction(user.uid, postId, { communityId, followed: true });
-    setPostActions((prev) => ({ ...prev, [postId]: { ...(prev[postId] || { postId }), followed: true } }));
+    const nextFollow = !(postActions[postId]?.followed);
+    await setPostAction(user.uid, postId, { communityId, followed: nextFollow });
+    setPostActions((prev) => ({ ...prev, [postId]: { ...(prev[postId] || { postId }), followed: nextFollow } }));
     setPostMenuOpenId(null);
-    setStatusMessage('You are now following updates on this post.');
+    setStatusMessage(nextFollow ? 'You are now following updates on this post.' : 'Unfollowed this post.');
   };
 
   const handleSavePost = async (postId: string) => {
@@ -673,10 +675,11 @@ export default function CommunityPage() {
       alert('Please sign in to save posts.');
       return;
     }
-    await setPostAction(user.uid, postId, { communityId, saved: true });
-    setPostActions((prev) => ({ ...prev, [postId]: { ...(prev[postId] || { postId }), saved: true } }));
+    const nextSaved = !(postActions[postId]?.saved);
+    await setPostAction(user.uid, postId, { communityId, saved: nextSaved });
+    setPostActions((prev) => ({ ...prev, [postId]: { ...(prev[postId] || { postId }), saved: nextSaved } }));
     setPostMenuOpenId(null);
-    setStatusMessage('Post saved to your list.');
+    setStatusMessage(nextSaved ? 'Post saved to your list.' : 'Removed from saved.');
   };
 
   const handleHidePost = async (postId: string) => {
@@ -684,22 +687,33 @@ export default function CommunityPage() {
       alert('Please sign in to hide posts.');
       return;
     }
-    await setPostAction(user.uid, postId, { communityId, hidden: true });
-    setPostActions((prev) => ({ ...prev, [postId]: { ...(prev[postId] || { postId }), hidden: true } }));
-    setPosts((prev) => prev.filter((p) => p.id !== postId));
+    const nextHidden = !(postActions[postId]?.hidden);
+    await setPostAction(user.uid, postId, { communityId, hidden: nextHidden });
+    setPostActions((prev) => ({ ...prev, [postId]: { ...(prev[postId] || { postId }), hidden: nextHidden } }));
+    if (nextHidden) {
+      setStatusMessage('Post hidden from your feed. Click unhide to bring it back.');
+    } else {
+      setStatusMessage('Post unhidden.');
+    }
     setPostMenuOpenId(null);
-    setStatusMessage('Post hidden from your feed.');
   };
 
-  const handleTranslatePost = async (postId: string) => {
+  const handleTranslatePost = async (postId: string, title?: string, content?: string) => {
     if (!user || !communityId) {
       alert('Please sign in to translate posts.');
       return;
     }
-    await setPostAction(user.uid, postId, { communityId, translated: true });
-    setPostActions((prev) => ({ ...prev, [postId]: { ...(prev[postId] || { postId }), translated: true } }));
-    setPostMenuOpenId(null);
-    setStatusMessage('Translation requested (coming soon).');
+    const lang = prompt('Enter target language code (e.g., en, es, fr):', 'en') || 'en';
+    try {
+      await translatePostContent(postId, lang, { title, content });
+      await setPostAction(user.uid, postId, { communityId, translated: true });
+      setPostActions((prev) => ({ ...prev, [postId]: { ...(prev[postId] || { postId }), translated: true } }));
+      setStatusMessage(`Translation ready (${lang}).`);
+    } catch (error: any) {
+      alert(error.message || 'Translation failed.');
+    } finally {
+      setPostMenuOpenId(null);
+    }
   };
 
   const handleReportPost = async (postId: string) => {
@@ -707,7 +721,8 @@ export default function CommunityPage() {
       alert('Please sign in to report posts.');
       return;
     }
-    await reportPost(communityId, postId, user.uid, 'User report');
+    const reason = prompt('Why are you reporting this post? (spam, harassment, hate, other)', 'spam') || 'unspecified';
+    await reportPost(communityId, postId, user.uid, reason);
     setPostMenuOpenId(null);
     setStatusMessage('Post reported. Thanks for your feedback.');
   };
@@ -1658,125 +1673,228 @@ export default function CommunityPage() {
               <div className="space-y-2">
                 {posts.map((post) => {
                   const canDelete = user && (post.authorId === user.uid || (community && community.creatorId === user.uid));
+                  const isHidden = !!postActions[post.id!]?.hidden;
                   return (
                     <div
                       key={post.id}
                       className="bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
                     >
-                      <Link
-                        href={`/community/post/${post.id}`}
-                        className="block p-3"
-                      >
-                        <div className="flex gap-3 p-3">
-                          {/* Voting column hidden (footer bar handles actions) */}
-                          <div className="hidden flex-col items-center gap-1 pt-1">
-                            <button
-                              onClick={(e) => {
-                                e.preventDefault();
-                                // Handle upvote
-                              }}
-                              className="text-gray-400 hover:text-green-600 transition-colors text-lg leading-none"
-                            >
-                              ▲
-                            </button>
-                            <span className="font-bold text-gray-900 text-xs">{post.upvotes - post.downvotes}</span>
-                            <button
-                              onClick={(e) => {
-                                e.preventDefault();
-                                // Handle downvote
-                              }}
-                              className="text-gray-400 hover:text-red-600 transition-colors text-lg leading-none"
-                            >
-                              ▼
-                            </button>
-                          </div>
-
-                          {/* Content */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1 flex-wrap">
-                              {post.isTip && (
-                                <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
-                                  💡 Tip
-                                </span>
-                              )}
-                              <Link
-                                href={`/community/user/${post.authorId}`}
-                                className="text-xs text-gray-500 hover:text-green-600 transition-colors font-medium"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                u/{post.authorName}
-                              </Link>
-                              <span className="text-xs text-gray-400">•</span>
-                              <span className="text-xs text-gray-500">{formatDate(post.createdAt)}</span>
-                            </div>
-                            <h3 className="text-base font-semibold text-gray-900 mb-2 line-clamp-2 hover:text-green-600 transition-colors">
-                              {post.title}
-                            </h3>
-                            {viewOption === 'card' && post.imageUrl && (
-                              <div className="mb-2">
-                                <img 
-                                  src={post.imageUrl} 
-                                  alt={post.title || 'Post image'} 
-                                  className="w-full rounded-md max-h-64 object-cover"
-                                />
-                              </div>
-                            )}
-                            <div className="flex items-center gap-3 text-xs text-gray-500">
-                              <span className="flex items-center gap-1 hover:text-green-600 transition-colors cursor-pointer">
-                                <MessageSquare className="w-3 h-3" />
-                                {post.commentCount} comments
-                              </span>
-                              <div onClick={(e) => e.stopPropagation()}>
-                                <ShareDropdown
-                                  postId={post.id!}
-                                  postTitle={post.title}
-                                  postImageUrl={post.imageUrl}
-                                  onCrosspostClick={() => setCrosspostModalPost({ id: post.id!, title: post.title })}
-                                />
-                              </div>
-                              <span className="flex items-center gap-1 hover:text-green-600 transition-colors cursor-pointer">
-                                Save
-                              </span>
-                            </div>
-
-                            {/* Inline action bar similar to Reddit (hidden, replaced by footer bar) */}
-                            <div className="hidden mt-3 flex-wrap items-center gap-2 text-sm text-gray-600">
-                              <div className="flex items-center gap-2">
+                      {isHidden ? (
+                        <div className="flex items-center justify-between px-4 py-3 text-sm text-gray-600">
+                          <span>This post is hidden.</span>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleHidePost(post.id!);
+                            }}
+                            className="px-3 py-1 rounded-full border border-gray-200 hover:border-green-500 hover:text-green-600 transition-colors"
+                          >
+                            Unhide
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <Link
+                            href={`/community/post/${post.id}`}
+                            className="block p-3"
+                          >
+                            <div className="flex gap-3 p-3">
+                              {/* Voting column hidden (footer bar handles actions) */}
+                              <div className="hidden flex-col items-center gap-1 pt-1">
                                 <button
                                   onClick={(e) => {
                                     e.preventDefault();
-                                    // hook real vote call here if desired
+                                    // Handle upvote
                                   }}
-                                  className="inline-flex items-center justify-center px-2 py-1 rounded-full border border-gray-200 hover:border-green-500 hover:text-green-600 transition-colors"
+                                  className="text-gray-400 hover:text-green-600 transition-colors text-lg leading-none"
+                                >
+                                  ▲
+                                </button>
+                                <span className="font-bold text-gray-900 text-xs">{post.upvotes - post.downvotes}</span>
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    // Handle downvote
+                                  }}
+                                  className="text-gray-400 hover:text-red-600 transition-colors text-lg leading-none"
+                                >
+                                  ▼
+                                </button>
+                              </div>
+
+                              {/* Content */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                  {post.isTip && (
+                                    <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
+                                      💡 Tip
+                                    </span>
+                                  )}
+                                  <Link
+                                    href={`/community/user/${post.authorId}`}
+                                    className="text-xs text-gray-500 hover:text-green-600 transition-colors font-medium"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    u/{post.authorName}
+                                  </Link>
+                                  <span className="text-xs text-gray-400">•</span>
+                                  <span className="text-xs text-gray-500">{formatDate(post.createdAt)}</span>
+                                </div>
+                                <h3 className="text-base font-semibold text-gray-900 mb-2 line-clamp-2 hover:text-green-600 transition-colors">
+                                  {post.title}
+                                </h3>
+                                {viewOption === 'card' && post.imageUrl && (
+                                  <div className="mb-2">
+                                    <img 
+                                      src={post.imageUrl} 
+                                      alt={post.title || 'Post image'} 
+                                      className="w-full rounded-md max-h-64 object-cover"
+                                    />
+                                  </div>
+                                )}
+                                <div className="flex items-center gap-3 text-xs text-gray-500">
+                                  <span className="flex items-center gap-1 hover:text-green-600 transition-colors cursor-pointer">
+                                    <MessageSquare className="w-3 h-3" />
+                                    {post.commentCount} comments
+                                  </span>
+                                  <div onClick={(e) => e.stopPropagation()}>
+                                    <ShareDropdown
+                                      postId={post.id!}
+                                      postTitle={post.title}
+                                      postImageUrl={post.imageUrl}
+                                      onCrosspostClick={() => setCrosspostModalPost({ id: post.id!, title: post.title })}
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Inline action bar similar to Reddit (hidden, replaced by footer bar) */}
+                                <div className="hidden mt-3 flex-wrap items-center gap-2 text-sm text-gray-600">
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        // hook real vote call here if desired
+                                      }}
+                                      className="inline-flex items-center justify-center px-2 py-1 rounded-full border border-gray-200 hover:border-green-500 hover:text-green-600 transition-colors"
+                                      title="Upvote"
+                                    >
+                                      <ArrowUp className="w-4 h-4" />
+                                    </button>
+                                    <span className="font-semibold text-gray-900">{post.upvotes - post.downvotes}</span>
+                                    <button
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        // hook real vote call here if desired
+                                      }}
+                                      className="inline-flex items-center justify-center px-2 py-1 rounded-full border border-gray-200 hover:border-red-500 hover:text-red-600 transition-colors"
+                                      title="Downvote"
+                                    >
+                                      <ArrowDown className="w-4 h-4" />
+                                    </button>
+                                  </div>
+
+                                  <span className="flex items-center gap-1 px-3 py-1 rounded-full border border-gray-200 hover:border-green-500 hover:text-green-600 transition-colors">
+                                    <MessageSquare className="w-4 h-4" />
+                                    {post.commentCount} comments
+                                  </span>
+
+                                  <div className="relative">
+                                    <button
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        setAwardOpenId((prev) => (prev === post.id ? null : post.id || null));
+                                      }}
+                                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors text-xs font-semibold"
+                                    >
+                                      <Award className="w-4 h-4" />
+                                      Award
+                                    </button>
+                                    {awardOpenId === post.id && (
+                                      <div className="absolute z-50 mt-2 w-72 rounded-lg border border-gray-200 bg-white shadow-xl p-3 space-y-2">
+                                        <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Give an award</div>
+                                        {awardOptions.map((a) => (
+                                          <button
+                                            key={a.name}
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              handleGiveAward(post.id!, a.name);
+                                            }}
+                                            className="w-full text-left flex items-start gap-3 rounded-md px-3 py-2 hover:bg-gray-50 transition-colors"
+                                          >
+                                            <div className="mt-1">{renderAwardIcon(a.icon)}</div>
+                                            <div>
+                                              <div className="text-sm font-semibold text-gray-900">{a.name}</div>
+                                              <div className="text-xs text-gray-500">{a.desc}</div>
+                                            </div>
+                                          </button>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <div onClick={(e) => e.stopPropagation()}>
+                                    <ShareDropdown
+                                      postId={post.id!}
+                                      postTitle={post.title}
+                                      postImageUrl={post.imageUrl}
+                                      onCrosspostClick={() => setCrosspostModalPost({ id: post.id!, title: post.title })}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </Link>
+                          {/* Footer action bar - Reddit style */}
+                          <div className="flex items-center justify-between px-3 py-2 border-t border-gray-100 bg-gray-50/60 text-sm text-gray-600">
+                              <div className="flex items-center gap-3 flex-wrap">
+                              <div className="flex items-center gap-1 rounded-full border border-gray-200 bg-white px-2 py-1">
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    // hook upvote
+                                  }}
+                                  className="text-gray-500 hover:text-green-600 transition-colors"
                                   title="Upvote"
                                 >
                                   <ArrowUp className="w-4 h-4" />
                                 </button>
-                                <span className="font-semibold text-gray-900">{post.upvotes - post.downvotes}</span>
+                                <span className="font-semibold text-gray-900 text-sm min-w-[1.5rem] text-center">
+                                  {post.upvotes - post.downvotes}
+                                </span>
                                 <button
                                   onClick={(e) => {
                                     e.preventDefault();
-                                    // hook real vote call here if desired
+                                    e.stopPropagation();
+                                    // hook downvote
                                   }}
-                                  className="inline-flex items-center justify-center px-2 py-1 rounded-full border border-gray-200 hover:border-red-500 hover:text-red-600 transition-colors"
+                                  className="text-gray-500 hover:text-red-600 transition-colors"
                                   title="Downvote"
                                 >
                                   <ArrowDown className="w-4 h-4" />
                                 </button>
                               </div>
 
-                              <span className="flex items-center gap-1 px-3 py-1 rounded-full border border-gray-200 hover:border-green-500 hover:text-green-600 transition-colors">
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                }}
+                                className="flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1 hover:border-green-500 hover:text-green-600 transition-colors"
+                              >
                                 <MessageSquare className="w-4 h-4" />
                                 {post.commentCount} comments
-                              </span>
+                              </button>
 
                               <div className="relative">
                                 <button
                                   onClick={(e) => {
                                     e.preventDefault();
+                                    e.stopPropagation();
                                     setAwardOpenId((prev) => (prev === post.id ? null : post.id || null));
                                   }}
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors text-xs font-semibold"
+                                  className="flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-3 py-1 hover:bg-amber-100 hover:border-amber-300 transition-colors"
                                 >
                                   <Award className="w-4 h-4" />
                                   Award
@@ -1789,6 +1907,7 @@ export default function CommunityPage() {
                                         key={a.name}
                                         onClick={(e) => {
                                           e.preventDefault();
+                                          e.stopPropagation();
                                           handleGiveAward(post.id!, a.name);
                                         }}
                                         className="w-full text-left flex items-start gap-3 rounded-md px-3 py-2 hover:bg-gray-50 transition-colors"
@@ -1804,7 +1923,7 @@ export default function CommunityPage() {
                                 )}
                               </div>
 
-                              <div onClick={(e) => e.stopPropagation()}>
+                              <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
                                 <ShareDropdown
                                   postId={post.id!}
                                   postTitle={post.title}
@@ -1812,153 +1931,65 @@ export default function CommunityPage() {
                                   onCrosspostClick={() => setCrosspostModalPost({ id: post.id!, title: post.title })}
                                 />
                               </div>
+
+                              <div className="relative">
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setPostMenuOpenId((prev) => (prev === post.id ? null : post.id || null));
+                                  }}
+                                  className="flex items-center gap-1 rounded-full border border-gray-200 bg-white px-3 py-1 hover:border-gray-300 hover:text-gray-800 transition-colors"
+                                  title="More actions"
+                                >
+                                  <MoreHorizontal className="w-4 h-4" />
+                                </button>
+                                {postMenuOpenId === post.id && (
+                                  <div className="absolute right-0 mt-2 w-56 rounded-lg border border-gray-200 bg-white shadow-xl z-30">
+                                    <div className="py-1 text-sm text-gray-800">
+                                      <button
+                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleFollowPost(post.id!); }}
+                                        className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left"
+                                      >
+                                        <BellRing className="w-4 h-4 text-amber-500" />
+                                        {postActions[post.id!]?.followed ? 'Unfollow post' : 'Follow post'}
+                                      </button>
+                                      <button
+                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleSavePost(post.id!); }}
+                                        className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left"
+                                      >
+                                        <Bookmark className="w-4 h-4 text-blue-500" />
+                                        {postActions[post.id!]?.saved ? 'Unsave' : 'Save'}
+                                      </button>
+                                      <button
+                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleHidePost(post.id!); }}
+                                        className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left"
+                                      >
+                                        <EyeOff className="w-4 h-4 text-gray-500" />
+                                        {postActions[post.id!]?.hidden ? 'Unhide' : 'Hide'}
+                                      </button>
+                                      <button
+                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleTranslatePost(post.id!, post.title, post.content); }}
+                                        className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left"
+                                      >
+                                        <Languages className="w-4 h-4 text-green-600" />
+                                        View in other languages
+                                      </button>
+                                      <button
+                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleReportPost(post.id!); }}
+                                        className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left"
+                                      >
+                                        <Flag className="w-4 h-4 text-red-500" />
+                                        Report
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </Link>
-                      {/* Footer action bar - Reddit style */}
-                      <div className="flex items-center justify-between px-3 py-2 border-t border-gray-100 bg-gray-50/60 text-sm text-gray-600">
-                        <div className="flex items-center gap-3 flex-wrap">
-                          <div className="flex items-center gap-1 rounded-full border border-gray-200 bg-white px-2 py-1">
-                            <button
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                // hook upvote
-                              }}
-                              className="text-gray-500 hover:text-green-600 transition-colors"
-                              title="Upvote"
-                            >
-                              <ArrowUp className="w-4 h-4" />
-                            </button>
-                            <span className="font-semibold text-gray-900 text-sm min-w-[1.5rem] text-center">
-                              {post.upvotes - post.downvotes}
-                            </span>
-                            <button
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                // hook downvote
-                              }}
-                              className="text-gray-500 hover:text-red-600 transition-colors"
-                              title="Downvote"
-                            >
-                              <ArrowDown className="w-4 h-4" />
-                            </button>
-                          </div>
-
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                            }}
-                            className="flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1 hover:border-green-500 hover:text-green-600 transition-colors"
-                          >
-                            <MessageSquare className="w-4 h-4" />
-                            {post.commentCount} comments
-                          </button>
-
-                          <div className="relative">
-                            <button
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setAwardOpenId((prev) => (prev === post.id ? null : post.id || null));
-                              }}
-                              className="flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-3 py-1 hover:bg-amber-100 hover:border-amber-300 transition-colors"
-                            >
-                              <Award className="w-4 h-4" />
-                              Award
-                            </button>
-                            {awardOpenId === post.id && (
-                              <div className="absolute z-50 mt-2 w-72 rounded-lg border border-gray-200 bg-white shadow-xl p-3 space-y-2">
-                                <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Give an award</div>
-                                {awardOptions.map((a) => (
-                                  <button
-                                    key={a.name}
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      handleGiveAward(post.id!, a.name);
-                                    }}
-                                    className="w-full text-left flex items-start gap-3 rounded-md px-3 py-2 hover:bg-gray-50 transition-colors"
-                                  >
-                                    <div className="mt-1">{renderAwardIcon(a.icon)}</div>
-                                    <div>
-                                      <div className="text-sm font-semibold text-gray-900">{a.name}</div>
-                                      <div className="text-xs text-gray-500">{a.desc}</div>
-                                    </div>
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-
-                          <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
-                            <ShareDropdown
-                              postId={post.id!}
-                              postTitle={post.title}
-                              postImageUrl={post.imageUrl}
-                              onCrosspostClick={() => setCrosspostModalPost({ id: post.id!, title: post.title })}
-                            />
-                          </div>
-
-                          <div className="relative">
-                            <button
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setPostMenuOpenId((prev) => (prev === post.id ? null : post.id || null));
-                              }}
-                              className="flex items-center gap-1 rounded-full border border-gray-200 bg-white px-3 py-1 hover:border-gray-300 hover:text-gray-800 transition-colors"
-                              title="More actions"
-                            >
-                              <MoreHorizontal className="w-4 h-4" />
-                            </button>
-                            {postMenuOpenId === post.id && (
-                              <div className="absolute right-0 mt-2 w-56 rounded-lg border border-gray-200 bg-white shadow-xl z-30">
-                                <div className="py-1 text-sm text-gray-800">
-                                  <button
-                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleFollowPost(post.id!); }}
-                                    className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left"
-                                  >
-                                    <BellRing className="w-4 h-4 text-amber-500" />
-                                    Follow post
-                                  </button>
-                                  <button
-                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleSavePost(post.id!); }}
-                                    className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left"
-                                  >
-                                    <Bookmark className="w-4 h-4 text-blue-500" />
-                                    Save
-                                  </button>
-                                  <button
-                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleHidePost(post.id!); }}
-                                    className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left"
-                                  >
-                                    <EyeOff className="w-4 h-4 text-gray-500" />
-                                    Hide
-                                  </button>
-                                  <button
-                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleTranslatePost(post.id!); }}
-                                    className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left"
-                                  >
-                                    <Languages className="w-4 h-4 text-green-600" />
-                                    View in other languages
-                                  </button>
-                                  <button
-                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleReportPost(post.id!); }}
-                                    className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left"
-                                  >
-                                    <Flag className="w-4 h-4 text-red-500" />
-                                    Report
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
+                        </>
+                      )}
                     </div>
                   );
                 })}
