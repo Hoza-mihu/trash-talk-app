@@ -221,8 +221,10 @@ export interface ModRequest {
 }
 
 export interface PostAction {
+  id?: string; // doc id (postId)
+  userId?: string;
   postId: string;
-  communityId?: string;
+  communityId?: string | null;
   followed?: boolean;
   saved?: boolean;
   hidden?: boolean;
@@ -236,6 +238,18 @@ export interface PostTranslation {
   title?: string;
   content?: string;
   createdAt: Timestamp | Date;
+}
+
+export interface PostReport {
+  id?: string;
+  communityId: string;
+  postId: string;
+  reporterId: string;
+  reason: string;
+  status?: 'pending' | 'reviewed' | 'resolved';
+  createdAt: Timestamp | Date;
+  resolvedAt?: Timestamp | Date;
+  resolvedBy?: string;
 }
 
 export interface Notification {
@@ -1317,23 +1331,24 @@ export async function sendModeratorMessage(
 export async function setPostAction(
   userId: string,
   postId: string,
-  action: Partial<Omit<PostAction, 'postId' | 'updatedAt'>> & { communityId?: string }
+  action: Partial<Omit<PostAction, 'postId' | 'updatedAt' | 'userId'>> & { communityId?: string | null }
 ) {
   if (!userId || !postId) throw new Error('userId and postId are required');
   const docRef = doc(db, 'users', userId, 'postActions', postId);
-  await setDoc(
-    docRef,
-    {
-      postId,
-      communityId: action.communityId || null,
-      followed: action.followed ?? false,
-      saved: action.saved ?? false,
-      hidden: action.hidden ?? false,
-      translated: action.translated ?? false,
-      updatedAt: serverTimestamp()
-    },
-    { merge: true }
-  );
+
+  const payload: Partial<PostAction> = {
+    postId,
+    userId,
+    communityId: action.communityId ?? null,
+    updatedAt: serverTimestamp()
+  };
+
+  if (typeof action.followed === 'boolean') payload.followed = action.followed;
+  if (typeof action.saved === 'boolean') payload.saved = action.saved;
+  if (typeof action.hidden === 'boolean') payload.hidden = action.hidden;
+  if (typeof action.translated === 'boolean') payload.translated = action.translated;
+
+  await setDoc(docRef, payload, { merge: true });
 }
 
 export async function getUserPostActionsForCommunity(userId: string, communityId: string): Promise<PostAction[]> {
@@ -1347,15 +1362,49 @@ export async function getUserPostActionsForCommunity(userId: string, communityId
     const data = d.data() as PostAction;
     return {
       ...data,
+      id: d.id,
+      userId: data.userId || userId,
+      communityId: data.communityId || communityId,
       postId: data.postId || d.id
     };
+  });
+}
+
+export function subscribeToUserPostActions(
+  userId: string,
+  communityId: string,
+  callback: (actions: Record<string, PostAction>) => void
+): Unsubscribe {
+  if (!userId || !communityId) {
+    return () => {};
+  }
+
+  const q = query(
+    collection(db, 'users', userId, 'postActions'),
+    where('communityId', '==', communityId)
+  );
+
+  return onSnapshot(q, (snapshot) => {
+    const map: Record<string, PostAction> = {};
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data() as PostAction;
+      const postId = data.postId || docSnap.id;
+      map[postId] = {
+        ...data,
+        id: docSnap.id,
+        postId,
+        userId: data.userId || userId,
+        communityId: data.communityId || communityId
+      };
+    });
+    callback(map);
   });
 }
 
 // Translation helpers
 export async function getPostTranslation(postId: string, lang: string): Promise<PostTranslation | null> {
   try {
-    const refDoc = doc(db, 'posts', postId, 'translations', lang);
+    const refDoc = doc(db, 'community_posts', postId, 'translations', lang);
     const snap = await getDoc(refDoc);
     if (!snap.exists()) return null;
     const data = snap.data() as PostTranslation;
@@ -1385,7 +1434,7 @@ export async function translatePostContent(
     });
     const translated = result.data as { title?: string; content?: string };
 
-    const refDoc = doc(db, 'posts', postId, 'translations', targetLang);
+    const refDoc = doc(db, 'community_posts', postId, 'translations', targetLang);
     const record: PostTranslation = {
       postId,
       lang: targetLang,
@@ -1407,14 +1456,34 @@ export async function reportPost(
   reporterId: string,
   reason: string
 ) {
-  if (!communityId || !postId || !reporterId) throw new Error('communityId, postId, reporterId are required');
+  if (!communityId || !postId || !reporterId || !reason) {
+    throw new Error('communityId, postId, reporterId and reason are required');
+  }
+
   const reportsRef = collection(db, 'communities', communityId, 'postReports');
-  await addDoc(reportsRef, {
+  const existing = await getDocs(
+    query(
+      reportsRef,
+      where('postId', '==', postId),
+      where('reporterId', '==', reporterId)
+    )
+  );
+
+  if (!existing.empty) {
+    throw new Error('You have already reported this post.');
+  }
+
+  const payload: PostReport = {
+    communityId,
     postId,
     reporterId,
     reason,
-    createdAt: serverTimestamp()
-  });
+    status: 'pending',
+    createdAt: serverTimestamp() as any
+  };
+
+  const docRef = await addDoc(reportsRef, payload as any);
+  return docRef.id;
 }
 
 // Get all communities

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Leaf, Users, Plus, MessageSquare, TrendingUp, Filter, Trash2, Bell, MoreHorizontal, Clock, Flame, Trophy, LayoutGrid, List, Edit2, Image as ImageIcon, X, Star, Bookmark, VolumeX, Rocket, Check, Sparkles, Home, Calendar, Globe, ArrowUp, ArrowDown, Award, MapPin, GraduationCap, Heart, Smile, BellRing, EyeOff, Languages, Flag } from 'lucide-react';
@@ -50,6 +50,7 @@ import {
   ModRequest,
   setPostAction,
   getUserPostActionsForCommunity,
+  subscribeToUserPostActions,
   reportPost,
   PostAction,
   translatePostContent
@@ -112,7 +113,12 @@ export default function CommunityPage() {
   const [messageTarget, setMessageTarget] = useState<'admin' | 'moderators'>('moderators');
   const [postMenuOpenId, setPostMenuOpenId] = useState<string | null>(null);
   const [postActions, setPostActions] = useState<Record<string, PostAction>>({});
+  const postActionsRef = useRef<Record<string, PostAction>>({});
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    postActionsRef.current = postActions;
+  }, [postActions]);
 
   useEffect(() => {
     if (communityId) {
@@ -143,7 +149,8 @@ export default function CommunityPage() {
       communityId, 
       (fetchedPosts) => {
         const sorted = sortPostsByOption(fetchedPosts, sortOption);
-        const filtered = user ? sorted.filter((p) => !(postActions[p.id!]?.hidden)) : sorted;
+        const hiddenMap = postActionsRef.current;
+        const filtered = user ? sorted.filter((p) => !(hiddenMap[p.id!]?.hidden)) : sorted;
         setPosts(filtered);
         if (!cancelled) setLoading(false); // subscription delivers fresh data
         
@@ -163,6 +170,7 @@ export default function CommunityPage() {
     );
 
     let unsubscribeNotifications: (() => void) | undefined;
+    let unsubscribePostActions: (() => void) | undefined;
 
     if (user) {
       const favorites = JSON.parse(localStorage.getItem('favoriteCommunities') || '[]');
@@ -175,14 +183,18 @@ export default function CommunityPage() {
         setUnreadCount(notifs.filter(n => !n.read).length);
       });
       loadPostActions();
+      unsubscribePostActions = subscribeToUserPostActions(user.uid, communityId, (actions) => {
+        setPostActions(actions);
+      });
     }
     
     return () => {
       cancelled = true;
       unsubscribePosts();
       if (unsubscribeNotifications) unsubscribeNotifications();
+      if (unsubscribePostActions) unsubscribePostActions();
     };
-  }, [communityId, sortOption, topRange, user, postActions]);
+  }, [communityId, sortOption, topRange, user]);
 
   useEffect(() => {
     // Resort locally when time range changes for top
@@ -493,7 +505,8 @@ export default function CommunityPage() {
       }
       
       const sorted = sortPostsByOption(fetched, sortOption);
-      const filtered = user ? sorted.filter((p) => !(postActions[p.id!]?.hidden)) : sorted;
+      const hiddenMap = postActionsRef.current;
+      const filtered = user ? sorted.filter((p) => !(hiddenMap[p.id!]?.hidden)) : sorted;
       setPosts(filtered);
       
       // Update highlights (latest and top posts)
@@ -660,57 +673,104 @@ export default function CommunityPage() {
 
   const handleFollowPost = async (postId: string) => {
     if (!user || !communityId) {
-      alert('Please sign in to follow posts.');
+      setStatusMessage('Please sign in to follow posts.');
       return;
     }
-    const nextFollow = !(postActions[postId]?.followed);
-    await setPostAction(user.uid, postId, { communityId, followed: nextFollow });
-    setPostActions((prev) => ({ ...prev, [postId]: { ...(prev[postId] || { postId }), followed: nextFollow } }));
-    setPostMenuOpenId(null);
-    setStatusMessage(nextFollow ? 'You are now following updates on this post.' : 'Unfollowed this post.');
+    try {
+      const nextFollow = !(postActionsRef.current[postId]?.followed);
+      await setPostAction(user.uid, postId, { communityId, followed: nextFollow });
+      setPostActions((prev) => ({
+        ...prev,
+        [postId]: {
+          ...(prev[postId] || { postId, communityId }),
+          postId,
+          communityId,
+          followed: nextFollow,
+          updatedAt: new Date()
+        }
+      }));
+      setStatusMessage(nextFollow ? 'Post followed. You will get updates.' : 'Post unfollowed.');
+    } catch (error: any) {
+      setStatusMessage(error?.message || 'Could not update follow status.');
+    } finally {
+      setPostMenuOpenId(null);
+    }
   };
 
   const handleSavePost = async (postId: string) => {
     if (!user || !communityId) {
-      alert('Please sign in to save posts.');
+      setStatusMessage('Please sign in to save posts.');
       return;
     }
-    const nextSaved = !(postActions[postId]?.saved);
-    await setPostAction(user.uid, postId, { communityId, saved: nextSaved });
-    setPostActions((prev) => ({ ...prev, [postId]: { ...(prev[postId] || { postId }), saved: nextSaved } }));
-    setPostMenuOpenId(null);
-    setStatusMessage(nextSaved ? 'Post saved to your list.' : 'Removed from saved.');
+    try {
+      const nextSaved = !(postActionsRef.current[postId]?.saved);
+      await setPostAction(user.uid, postId, { communityId, saved: nextSaved });
+      setPostActions((prev) => ({
+        ...prev,
+        [postId]: {
+          ...(prev[postId] || { postId, communityId }),
+          postId,
+          communityId,
+          saved: nextSaved,
+          updatedAt: new Date()
+        }
+      }));
+      setStatusMessage(nextSaved ? 'Post saved to your list.' : 'Removed from saved.');
+    } catch (error: any) {
+      setStatusMessage(error?.message || 'Could not update saved posts.');
+    } finally {
+      setPostMenuOpenId(null);
+    }
   };
 
   const handleHidePost = async (postId: string) => {
     if (!user || !communityId) {
-      alert('Please sign in to hide posts.');
+      setStatusMessage('Please sign in to hide posts.');
       return;
     }
-    const nextHidden = !(postActions[postId]?.hidden);
-    await setPostAction(user.uid, postId, { communityId, hidden: nextHidden });
-    setPostActions((prev) => ({ ...prev, [postId]: { ...(prev[postId] || { postId }), hidden: nextHidden } }));
-    if (nextHidden) {
-      setStatusMessage('Post hidden from your feed. Click unhide to bring it back.');
-    } else {
-      setStatusMessage('Post unhidden.');
+    try {
+      const nextHidden = !(postActionsRef.current[postId]?.hidden);
+      await setPostAction(user.uid, postId, { communityId, hidden: nextHidden });
+      setPostActions((prev) => ({
+        ...prev,
+        [postId]: {
+          ...(prev[postId] || { postId, communityId }),
+          postId,
+          communityId,
+          hidden: nextHidden,
+          updatedAt: new Date()
+        }
+      }));
+      setStatusMessage(nextHidden ? 'Post hidden from your feed. Click unhide to bring it back.' : 'Post unhidden.');
+    } catch (error: any) {
+      setStatusMessage(error?.message || 'Could not update hide status.');
+    } finally {
+      setPostMenuOpenId(null);
     }
-    setPostMenuOpenId(null);
   };
 
   const handleTranslatePost = async (postId: string, title?: string, content?: string) => {
     if (!user || !communityId) {
-      alert('Please sign in to translate posts.');
+      setStatusMessage('Please sign in to translate posts.');
       return;
     }
     const lang = prompt('Enter target language code (e.g., en, es, fr):', 'en') || 'en';
     try {
       await translatePostContent(postId, lang, { title, content });
       await setPostAction(user.uid, postId, { communityId, translated: true });
-      setPostActions((prev) => ({ ...prev, [postId]: { ...(prev[postId] || { postId }), translated: true } }));
-      setStatusMessage(`Translation ready (${lang}).`);
+      setPostActions((prev) => ({
+        ...prev,
+        [postId]: {
+          ...(prev[postId] || { postId, communityId }),
+          postId,
+          communityId,
+          translated: true,
+          updatedAt: new Date()
+        }
+      }));
+      setStatusMessage(`Translation ready and cached (${lang}).`);
     } catch (error: any) {
-      alert(error.message || 'Translation failed.');
+      setStatusMessage(error?.message || 'Translation failed.');
     } finally {
       setPostMenuOpenId(null);
     }
@@ -718,13 +778,23 @@ export default function CommunityPage() {
 
   const handleReportPost = async (postId: string) => {
     if (!user || !communityId) {
-      alert('Please sign in to report posts.');
+      setStatusMessage('Please sign in to report posts.');
       return;
     }
-    const reason = prompt('Why are you reporting this post? (spam, harassment, hate, other)', 'spam') || 'unspecified';
-    await reportPost(communityId, postId, user.uid, reason);
-    setPostMenuOpenId(null);
-    setStatusMessage('Post reported. Thanks for your feedback.');
+    const reason = (prompt('Why are you reporting this post? (spam, harassment, hate, other)', 'spam') || '').trim();
+    if (!reason) {
+      setPostMenuOpenId(null);
+      setStatusMessage('Report cancelled.');
+      return;
+    }
+    try {
+      await reportPost(communityId, postId, user.uid, reason);
+      setStatusMessage('Post reported. Thanks for your feedback.');
+    } catch (error: any) {
+      setStatusMessage(error?.message || 'Failed to report post.');
+    } finally {
+      setPostMenuOpenId(null);
+    }
   };
 
   useEffect(() => {

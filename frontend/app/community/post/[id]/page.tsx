@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, MessageSquare, Leaf, Send, Trash2, ArrowUp, ArrowDown, Award, Sparkles, MapPin, GraduationCap, Globe2, Check, Heart, Smile, Trophy, MoreHorizontal, BellRing, Bookmark, EyeOff, Languages, Flag } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { getPostById, addComment, getCommentsByPostId, voteOnPost, getUserVote, deletePost, getCommunityById, Comment, Community, getUserPostActionsForCommunity, setPostAction, reportPost, PostAction } from '@/lib/community';
+import { getPostById, addComment, getCommentsByPostId, voteOnPost, getUserVote, deletePost, getCommunityById, Comment, Community, getUserPostActionsForCommunity, setPostAction, reportPost, PostAction, translatePostContent, subscribeToUserPostActions } from '@/lib/community';
 import { getUserProfile } from '@/lib/profile';
 import { CommunityPost } from '@/lib/community';
 import { CATEGORY_COLORS } from '@/lib/stats';
@@ -31,8 +31,10 @@ export default function PostDetailPage() {
   const [showCrosspostModal, setShowCrosspostModal] = useState(false);
   const [showAwardsMenu, setShowAwardsMenu] = useState(false);
   const awardsMenuRef = useRef<HTMLDivElement>(null);
-  const [postAction, setPostActionState] = useState<PostAction | null>(null);
+  const [postActionState, setPostActionState] = useState<PostAction | null>(null);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const actionMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (postId) {
@@ -49,11 +51,8 @@ export default function PostDetailPage() {
       if (awardsMenuRef.current && !awardsMenuRef.current.contains(e.target as Node)) {
         setShowAwardsMenu(false);
       }
-      if (actionMenuOpen) {
-        const target = e.target as HTMLElement;
-        if (!target.closest('.post-actions-menu')) {
-          setActionMenuOpen(false);
-        }
+      if (actionMenuOpen && actionMenuRef.current && !actionMenuRef.current.contains(e.target as Node)) {
+        setActionMenuOpen(false);
       }
     };
     if (showAwardsMenu || actionMenuOpen) {
@@ -63,16 +62,22 @@ export default function PostDetailPage() {
   }, [showAwardsMenu, actionMenuOpen]);
 
   useEffect(() => {
-    const onClickAway = (e: MouseEvent) => {
-      if (awardsMenuRef.current && !awardsMenuRef.current.contains(e.target as Node)) {
-        setShowAwardsMenu(false);
+    if (!statusMessage) return;
+    const timer = setTimeout(() => setStatusMessage(null), 2500);
+    return () => clearTimeout(timer);
+  }, [statusMessage]);
+
+  useEffect(() => {
+    if (!user || !community?.id) return;
+    const unsubscribe = subscribeToUserPostActions(user.uid, community.id, (actions) => {
+      const match = actions[postId];
+      setPostActionState(match || null);
+      if (match?.hidden) {
+        router.push(`/community/c/${community.id}`);
       }
-    };
-    if (showAwardsMenu) {
-      document.addEventListener('mousedown', onClickAway);
-    }
-    return () => document.removeEventListener('mousedown', onClickAway);
-  }, [showAwardsMenu]);
+    });
+    return () => unsubscribe();
+  }, [user?.uid, community?.id, postId]);
 
   const loadUserVote = async () => {
     if (!user) return;
@@ -210,7 +215,7 @@ export default function PostDetailPage() {
       const match = actions.find((a) => a.postId === postId);
       setPostActionState(match || null);
       if (match?.hidden) {
-        router.push('/community');
+        router.push(`/community/c/${communityId}`);
       }
     } catch (error) {
       console.error('Error loading post action:', error);
@@ -234,56 +239,119 @@ export default function PostDetailPage() {
 
   const handleFollowPost = async () => {
     if (!user || !community) {
-      alert('Please sign in to follow posts.');
+      setStatusMessage('Please sign in to follow posts.');
       return;
     }
-    await setPostAction(user.uid, postId, { communityId: community.id, followed: true });
-    setPostActionState((prev) => ({ ...(prev || { postId }), postId, communityId: community.id, followed: true, updatedAt: new Date() }));
-    setActionMenuOpen(false);
-    alert('You are now following updates on this post.');
+    try {
+      const nextFollow = !(postActionState?.followed);
+      await setPostAction(user.uid, postId, { communityId: community.id, followed: nextFollow });
+      setPostActionState((prev) => ({
+        ...(prev || { postId, communityId: community.id }),
+        postId,
+        communityId: community.id,
+        followed: nextFollow,
+        updatedAt: new Date()
+      }));
+      setStatusMessage(nextFollow ? 'Post followed. You will get updates.' : 'Post unfollowed.');
+    } catch (error: any) {
+      setStatusMessage(error?.message || 'Could not update follow status.');
+    } finally {
+      setActionMenuOpen(false);
+    }
   };
 
   const handleSavePost = async () => {
     if (!user || !community) {
-      alert('Please sign in to save posts.');
+      setStatusMessage('Please sign in to save posts.');
       return;
     }
-    await setPostAction(user.uid, postId, { communityId: community.id, saved: true });
-    setPostActionState((prev) => ({ ...(prev || { postId }), postId, communityId: community.id, saved: true, updatedAt: new Date() }));
-    setActionMenuOpen(false);
-    alert('Post saved.');
+    try {
+      const nextSaved = !(postActionState?.saved);
+      await setPostAction(user.uid, postId, { communityId: community.id, saved: nextSaved });
+      setPostActionState((prev) => ({
+        ...(prev || { postId, communityId: community.id }),
+        postId,
+        communityId: community.id,
+        saved: nextSaved,
+        updatedAt: new Date()
+      }));
+      setStatusMessage(nextSaved ? 'Post saved to your list.' : 'Removed from saved.');
+    } catch (error: any) {
+      setStatusMessage(error?.message || 'Could not update saved posts.');
+    } finally {
+      setActionMenuOpen(false);
+    }
   };
 
   const handleHidePost = async () => {
     if (!user || !community) {
-      alert('Please sign in to hide posts.');
+      setStatusMessage('Please sign in to hide posts.');
       return;
     }
-    await setPostAction(user.uid, postId, { communityId: community.id, hidden: true });
-    setPostActionState((prev) => ({ ...(prev || { postId }), postId, communityId: community.id, hidden: true, updatedAt: new Date() }));
-    setActionMenuOpen(false);
-    router.push('/community');
+    try {
+      const nextHidden = !(postActionState?.hidden);
+      await setPostAction(user.uid, postId, { communityId: community.id, hidden: nextHidden });
+      setPostActionState((prev) => ({
+        ...(prev || { postId, communityId: community.id }),
+        postId,
+        communityId: community.id,
+        hidden: nextHidden,
+        updatedAt: new Date()
+      }));
+      setStatusMessage(nextHidden ? 'Post hidden from your feed. Tap Unhide to bring it back.' : 'Post unhidden.');
+      if (nextHidden) {
+        router.push(`/community/c/${community.id}`);
+      }
+    } catch (error: any) {
+      setStatusMessage(error?.message || 'Could not update hide status.');
+    } finally {
+      setActionMenuOpen(false);
+    }
   };
 
   const handleTranslatePost = async () => {
-    if (!user || !community) {
-      alert('Please sign in to translate posts.');
+    if (!user || !community || !post) {
+      setStatusMessage('Please sign in to translate posts.');
       return;
     }
-    await setPostAction(user.uid, postId, { communityId: community.id, translated: true });
-    setPostActionState((prev) => ({ ...(prev || { postId }), postId, communityId: community.id, translated: true, updatedAt: new Date() }));
-    setActionMenuOpen(false);
-    alert('Translation feature coming soon.');
+    const lang = prompt('Enter target language code (e.g., en, es, fr):', 'en') || 'en';
+    try {
+      await translatePostContent(postId, lang, { title: post.title, content: post.content });
+      await setPostAction(user.uid, postId, { communityId: community.id, translated: true });
+      setPostActionState((prev) => ({
+        ...(prev || { postId, communityId: community.id }),
+        postId,
+        communityId: community.id,
+        translated: true,
+        updatedAt: new Date()
+      }));
+      setStatusMessage(`Translation cached (${lang}).`);
+    } catch (error: any) {
+      setStatusMessage(error?.message || 'Translation failed.');
+    } finally {
+      setActionMenuOpen(false);
+    }
   };
 
   const handleReportPost = async () => {
     if (!user || !community || !community.id) {
-      alert('Please sign in to report posts.');
+      setStatusMessage('Please sign in to report posts.');
       return;
     }
-    await reportPost(community.id, postId, user.uid, 'User report');
-    setActionMenuOpen(false);
-    alert('Post reported. Thank you for your feedback.');
+    const reason = (prompt('Why are you reporting this post? (spam, harassment, hate, other)', 'User report') || '').trim();
+    if (!reason) {
+      setStatusMessage('Report cancelled.');
+      setActionMenuOpen(false);
+      return;
+    }
+    try {
+      await reportPost(community.id, postId, user.uid, reason);
+      setStatusMessage('Post reported. Thank you for your feedback.');
+    } catch (error: any) {
+      setStatusMessage(error?.message || 'Failed to report post.');
+    } finally {
+      setActionMenuOpen(false);
+    }
   };
 
   const handleDeletePost = async () => {
@@ -588,7 +656,7 @@ export default function PostDetailPage() {
                 onCrosspostClick={() => setShowCrosspostModal(true)}
               />
 
-              <div className="relative post-actions-menu">
+              <div className="relative post-actions-menu" ref={actionMenuRef}>
                 <button
                   onClick={(e) => {
                     e.preventDefault();
@@ -606,28 +674,28 @@ export default function PostDetailPage() {
                         className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left"
                       >
                         <BellRing className="w-4 h-4 text-amber-500" />
-                        Follow post
+                        {postActionState?.followed ? 'Unfollow post' : 'Follow post'}
                       </button>
                       <button
                         onClick={(e) => { e.preventDefault(); handleSavePost(); }}
                         className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left"
                       >
                         <Bookmark className="w-4 h-4 text-blue-500" />
-                        Save
+                        {postActionState?.saved ? 'Unsave' : 'Save'}
                       </button>
                       <button
                         onClick={(e) => { e.preventDefault(); handleHidePost(); }}
                         className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left"
                       >
                         <EyeOff className="w-4 h-4 text-gray-500" />
-                        Hide
+                        {postActionState?.hidden ? 'Unhide' : 'Hide'}
                       </button>
                       <button
                         onClick={(e) => { e.preventDefault(); handleTranslatePost(); }}
                         className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left"
                       >
                         <Languages className="w-4 h-4 text-green-600" />
-                        View in other languages
+                        {postActionState?.translated ? 'View translation' : 'View in other languages'}
                       </button>
                       <button
                         onClick={(e) => { e.preventDefault(); handleReportPost(); }}
@@ -733,6 +801,14 @@ export default function PostDetailPage() {
           </div>
         </div>
       </div>
+
+      {statusMessage && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <div className="bg-gray-900 text-white text-sm font-medium px-4 py-2 rounded-full shadow-lg">
+            {statusMessage}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
