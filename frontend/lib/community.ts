@@ -238,6 +238,7 @@ export interface PostTranslation {
   title?: string;
   content?: string;
   createdAt: Timestamp | Date;
+  isFallback?: boolean; // True if translation came from fallback method
 }
 
 export interface PostReport {
@@ -1415,38 +1416,91 @@ export async function getPostTranslation(postId: string, lang: string): Promise<
   }
 }
 
+// Helper function to translate text using MyMemory API (free, no API key needed)
+async function translateText(text: string, targetLang: string, sourceLang: string = 'en'): Promise<string> {
+  if (!text || text.trim() === '') return text;
+  
+  try {
+    const response = await fetch(
+      `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLang}|${targetLang}`
+    );
+    const data = await response.json();
+    
+    if (data.responseStatus === 200 && data.responseData?.translatedText) {
+      return data.responseData.translatedText;
+    }
+    
+    // If API fails, return original text
+    return text;
+  } catch (error) {
+    console.warn('Translation API error:', error);
+    return text;
+  }
+}
+
 export async function translatePostContent(
   postId: string,
   targetLang: string,
   payload: { title?: string; content?: string }
 ): Promise<PostTranslation> {
-  // Check cache
+  // Check cache first
   const cached = await getPostTranslation(postId, targetLang);
-  if (cached) return cached;
+  if (cached && !cached.isFallback) return cached;
 
   try {
-    const translateFn = httpsCallable(functions, 'translatePost');
-    const result = await translateFn({
-      postId,
-      targetLang,
-      title: payload.title || '',
-      content: payload.content || ''
-    });
-    const translated = result.data as { title?: string; content?: string };
+    // First try using Firebase Cloud Function for translation (if available)
+    try {
+      const translateFn = httpsCallable(functions, 'translatePost');
+      const result = await translateFn({
+        postId,
+        targetLang,
+        title: payload.title || '',
+        content: payload.content || ''
+      });
+      const translated = result.data as { title?: string; content?: string };
 
-    const refDoc = doc(db, 'community_posts', postId, 'translations', targetLang);
+      const refDoc = doc(db, 'community_posts', postId, 'translations', targetLang);
+      const record: PostTranslation = {
+        postId,
+        lang: targetLang,
+        title: translated.title || '',
+        content: translated.content || '',
+        createdAt: serverTimestamp() as any
+      };
+      await setDoc(refDoc, record);
+      return { ...record, createdAt: new Date() };
+    } catch (cloudFunctionError: any) {
+      // If Cloud Function doesn't exist or fails, use free API fallback
+      console.log('Cloud Function not available, using free translation API...');
+    }
+
+    // Fallback: Use free MyMemory Translation API
+    const translatedTitle = payload.title ? await translateText(payload.title, targetLang) : '';
+    const translatedContent = payload.content ? await translateText(payload.content, targetLang) : '';
+
     const record: PostTranslation = {
       postId,
       lang: targetLang,
-      title: translated.title || '',
-      content: translated.content || '',
-      createdAt: serverTimestamp() as any
+      title: translatedTitle,
+      content: translatedContent,
+      createdAt: new Date()
     };
-    await setDoc(refDoc, record);
-    return { ...record, createdAt: new Date() };
-  } catch (error) {
+
+    // Cache the translation
+    try {
+      const refDoc = doc(db, 'community_posts', postId, 'translations', targetLang);
+      await setDoc(refDoc, {
+        ...record,
+        createdAt: serverTimestamp()
+      });
+    } catch (cacheError) {
+      console.warn('Could not cache translation:', cacheError);
+    }
+
+    return record;
+  } catch (error: any) {
     console.error('Error translating post:', error);
-    throw error;
+    throw new Error('Translation failed. Please try again later.');
   }
 }
 

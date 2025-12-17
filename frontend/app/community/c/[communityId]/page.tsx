@@ -117,6 +117,34 @@ export default function CommunityPage() {
   const [toasts, setToasts] = useState<{ id: number; text: string; tone?: 'success' | 'error' | 'info' }[]>([]);
   const toastSeq = useRef(0);
   const isMounted = useRef(true);
+  
+  // Translation modal state
+  const [translateModalOpen, setTranslateModalOpen] = useState(false);
+  const [translatePostData, setTranslatePostData] = useState<{ postId: string; title?: string; content?: string } | null>(null);
+  const [translating, setTranslating] = useState(false);
+  const [translationResult, setTranslationResult] = useState<{ title: string; content: string; lang: string; langName: string } | null>(null);
+  
+  // Available languages for translation
+  const LANGUAGES = [
+    { code: 'en', name: 'English', native: 'English' },
+    { code: 'it', name: 'Italian', native: 'Italiano' },
+    { code: 'fr', name: 'French', native: 'Français' },
+    { code: 'es', name: 'Spanish', native: 'Español (Latinoamérica)' },
+    { code: 'th', name: 'Thai', native: 'ไทย' },
+    { code: 'de', name: 'German', native: 'Deutsch' },
+    { code: 'pt', name: 'Portuguese', native: 'Português (Brasil)' },
+    { code: 'hi', name: 'Hindi', native: 'हिन्दी' },
+    { code: 'zh', name: 'Chinese', native: '中文' },
+    { code: 'ja', name: 'Japanese', native: '日本語' },
+    { code: 'ko', name: 'Korean', native: '한국어' },
+    { code: 'ar', name: 'Arabic', native: 'العربية' },
+    { code: 'ru', name: 'Russian', native: 'Русский' },
+    { code: 'nl', name: 'Dutch', native: 'Nederlands' },
+    { code: 'pl', name: 'Polish', native: 'Polski' },
+    { code: 'tr', name: 'Turkish', native: 'Türkçe' },
+    { code: 'vi', name: 'Vietnamese', native: 'Tiếng Việt' },
+    { code: 'id', name: 'Indonesian', native: 'Bahasa Indonesia' },
+  ];
 
   const showToast = (text: string, tone: 'success' | 'error' | 'info' = 'info') => {
     toastSeq.current += 1;
@@ -615,6 +643,29 @@ export default function CommunityPage() {
     }
   };
 
+  // Handle join/leave for sidebar communities (different from current community)
+  const handleJoinCommunity = async (targetCommunityId: string) => {
+    if (!user) {
+      router.push('/auth');
+      return;
+    }
+
+    try {
+      const isCurrentlyMember = userCommunities.some(c => c.id === targetCommunityId);
+      if (isCurrentlyMember) {
+        await leaveCommunity(targetCommunityId, user.uid);
+      } else {
+        await joinCommunity(targetCommunityId, user.uid);
+      }
+      // Reload user communities to update sidebar
+      await loadUserCommunities();
+      await loadPopularCommunities();
+    } catch (error) {
+      console.error('Error joining/leaving community:', error);
+      alert('Failed to join/leave community. Please try again.');
+    }
+  };
+
   const handleNotificationPreferenceChange = async (preference: 'all' | 'popular' | 'off' | 'mute') => {
     if (!user || !isMember) return;
     
@@ -788,30 +839,64 @@ export default function CommunityPage() {
     }
   };
 
-  const handleTranslatePost = async (postId: string, title?: string, content?: string) => {
+  // Open translation modal
+  const handleTranslatePost = (postId: string, title?: string, content?: string) => {
     if (!user || !communityId) {
       showToast('Please sign in to translate posts.', 'error');
       return;
     }
-    const lang = prompt('Enter target language code (e.g., en, es, fr):', 'en') || 'en';
+    setTranslatePostData({ postId, title, content });
+    setTranslateModalOpen(true);
+    setPostMenuOpenId(null);
+  };
+  
+  // Handle language selection and translate
+  const handleSelectLanguage = async (langCode: string, langName: string) => {
+    if (!user || !communityId || !translatePostData) {
+      return;
+    }
+    
+    setTranslating(true);
+    
     try {
-      await translatePostContent(postId, lang, { title, content });
-      await setPostAction(user.uid, postId, { communityId, translated: true });
+      const translation = await translatePostContent(
+        translatePostData.postId, 
+        langCode, 
+        { title: translatePostData.title, content: translatePostData.content }
+      );
+      
+      await setPostAction(user.uid, translatePostData.postId, { communityId, translated: true });
       setPostActions((prev) => ({
         ...prev,
-        [postId]: {
-          ...(prev[postId] || { postId, communityId }),
-          postId,
+        [translatePostData.postId]: {
+          ...(prev[translatePostData.postId] || { postId: translatePostData.postId, communityId }),
+          postId: translatePostData.postId,
           communityId,
           translated: true,
           updatedAt: new Date()
         }
       }));
-      showToast(`Translation ready and cached (${lang}).`, 'success');
+      
+      // Show translation result in the modal
+      const lang = LANGUAGES.find(l => l.code === langCode);
+      setTranslationResult({
+        title: translation.title || translatePostData.title || '',
+        content: translation.content || translatePostData.content || '',
+        lang: langCode,
+        langName: lang?.native || langName
+      });
+      
+      showToast(`Translated to ${langName} successfully!`, 'success');
     } catch (error: any) {
-      showToast(error?.message || 'Translation failed.', 'error');
+      setTranslateModalOpen(false);
+      setTranslatePostData(null);
+      if (error?.message?.includes('unavailable') || error?.message?.includes('not available')) {
+        showToast('Translation service is coming soon.', 'info');
+      } else {
+        showToast(error?.message || 'Translation failed.', 'error');
+      }
     } finally {
-      setPostMenuOpenId(null);
+      setTranslating(false);
     }
   };
 
@@ -1453,26 +1538,59 @@ export default function CommunityPage() {
 
                   {userCommunities.length > 0 && (
                     <div className="pt-4 border-t border-gray-200">
-                      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2 px-2">Your Communities</h4>
-                      <div className="space-y-1 max-h-64 overflow-y-auto">
+                      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2 px-2 flex items-center gap-2">
+                        <Users className="w-4 h-4 text-green-600" />
+                        Your Communities
+                      </h4>
+                      <div className="space-y-2 max-h-96 overflow-y-auto">
                         {userCommunities.slice(0, 10).map((comm) => (
                           <Link
                             key={comm.id}
                             href={`/community/c/${comm.id}`}
-                            className="flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                            className="block p-3 rounded-lg hover:bg-green-50 transition-colors border border-transparent hover:border-green-200"
                           >
-                            {comm.iconUrl || comm.imageUrl ? (
-                              <img
-                                src={comm.iconUrl || comm.imageUrl}
-                                alt={comm.name}
-                                className="w-5 h-5 rounded-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-5 h-5 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                                {comm.name.charAt(0).toUpperCase()}
+                            <div className="flex items-center gap-2 mb-2">
+                              {(comm.iconUrl && comm.iconUrl.trim() !== '') || (comm.imageUrl && comm.imageUrl.trim() !== '') ? (
+                                <img
+                                  src={comm.iconUrl || comm.imageUrl}
+                                  alt={comm.name}
+                                  className="w-8 h-8 rounded-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                                  {comm.name.charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-gray-900 truncate text-sm">r/{comm.name}</p>
+                                <p className="text-xs text-gray-500">{comm.memberCount} members</p>
+                              </div>
+                            </div>
+                            {/* Weekly Stats */}
+                            {(comm.weeklyVisitors !== undefined || comm.weeklyContributions !== undefined) && (
+                              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-100">
+                                <div className="text-center">
+                                  <div className="text-lg font-bold text-gray-900 mb-0.5">
+                                    {comm.weeklyVisitors !== undefined
+                                      ? comm.weeklyVisitors >= 1000
+                                        ? `${(comm.weeklyVisitors / 1000).toFixed(1)}K`
+                                        : comm.weeklyVisitors.toLocaleString()
+                                      : '0'}
+                                  </div>
+                                  <div className="text-[10px] text-gray-500">Weekly visitors</div>
+                                </div>
+                                <div className="text-center">
+                                  <div className="text-lg font-bold text-gray-900 mb-0.5">
+                                    {comm.weeklyContributions !== undefined
+                                      ? comm.weeklyContributions >= 1000
+                                        ? `${(comm.weeklyContributions / 1000).toFixed(1)}K`
+                                        : comm.weeklyContributions.toLocaleString()
+                                      : '0'}
+                                  </div>
+                                  <div className="text-[10px] text-gray-500">Weekly contributions</div>
+                                </div>
                               </div>
                             )}
-                            <span className="truncate">r/{comm.name}</span>
                           </Link>
                         ))}
                       </div>
@@ -1481,28 +1599,80 @@ export default function CommunityPage() {
 
                   {popularCommunities.length > 0 && (
                     <div className="pt-4 border-t border-gray-200">
-                      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2 px-2">Popular Communities</h4>
-                      <div className="space-y-1 max-h-64 overflow-y-auto">
-                        {popularCommunities.filter(c => c.id !== communityId).slice(0, 5).map((comm) => (
-                          <Link
-                            key={comm.id}
-                            href={`/community/c/${comm.id}`}
-                            className="flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                          >
-                            {comm.iconUrl || comm.imageUrl ? (
-                              <img
-                                src={comm.iconUrl || comm.imageUrl}
-                                alt={comm.name}
-                                className="w-5 h-5 rounded-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-5 h-5 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                                {comm.name.charAt(0).toUpperCase()}
+                      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2 px-2 flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4 text-green-600" />
+                        Popular Communities
+                      </h4>
+                      <div className="space-y-2 max-h-96 overflow-y-auto">
+                        {popularCommunities.filter(c => c.id !== communityId).slice(0, 5).map((comm) => {
+                          const isUserMember = userCommunities.some(c => c.id === comm.id);
+                          return (
+                            <div
+                              key={comm.id}
+                              className="p-3 rounded-lg hover:bg-green-50 transition-colors border border-transparent hover:border-green-200"
+                            >
+                              <div className="flex items-center gap-2 mb-2">
+                                {(comm.iconUrl && comm.iconUrl.trim() !== '') || (comm.imageUrl && comm.imageUrl.trim() !== '') ? (
+                                  <img
+                                    src={comm.iconUrl || comm.imageUrl}
+                                    alt={comm.name}
+                                    className="w-8 h-8 rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                                    {comm.name.charAt(0).toUpperCase()}
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <Link
+                                    href={`/community/c/${comm.id}`}
+                                    className="font-medium text-gray-900 hover:text-green-600 transition-colors text-sm"
+                                  >
+                                    r/{comm.name}
+                                  </Link>
+                                  <p className="text-xs text-gray-500">{comm.memberCount} members</p>
+                                </div>
                               </div>
-                            )}
-                            <span className="truncate">r/{comm.name}</span>
-                          </Link>
-                        ))}
+                              {/* Weekly Stats */}
+                              {(comm.weeklyVisitors !== undefined || comm.weeklyContributions !== undefined) && (
+                                <div className="grid grid-cols-2 gap-3 pt-2 mb-2 border-t border-gray-100">
+                                  <div className="text-center">
+                                    <div className="text-lg font-bold text-gray-900 mb-0.5">
+                                      {comm.weeklyVisitors !== undefined
+                                        ? comm.weeklyVisitors >= 1000
+                                          ? `${(comm.weeklyVisitors / 1000).toFixed(1)}K`
+                                          : comm.weeklyVisitors.toLocaleString()
+                                        : '0'}
+                                    </div>
+                                    <div className="text-[10px] text-gray-500">Weekly visitors</div>
+                                  </div>
+                                  <div className="text-center">
+                                    <div className="text-lg font-bold text-gray-900 mb-0.5">
+                                      {comm.weeklyContributions !== undefined
+                                        ? comm.weeklyContributions >= 1000
+                                          ? `${(comm.weeklyContributions / 1000).toFixed(1)}K`
+                                          : comm.weeklyContributions.toLocaleString()
+                                        : '0'}
+                                    </div>
+                                    <div className="text-[10px] text-gray-500">Weekly contributions</div>
+                                  </div>
+                                </div>
+                              )}
+                              {user && (
+                                <button
+                                  onClick={() => handleJoinCommunity(comm.id!)}
+                                  className={`w-full text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                                    isUserMember
+                                      ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                      : 'bg-green-600 text-white hover:bg-green-700'
+                                  }`}
+                                >
+                                  {isUserMember ? 'Joined' : 'Join'}
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -2100,7 +2270,7 @@ export default function CommunityPage() {
             <div className="bg-white rounded-lg border border-gray-200 p-4 sticky top-20 space-y-4">
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  {(community.iconUrl || community.imageUrl) ? (
+                  {(community.iconUrl && community.iconUrl.trim() !== '') || (community.imageUrl && community.imageUrl.trim() !== '') ? (
                     <img
                       src={community.iconUrl || community.imageUrl}
                       alt={community.name}
@@ -2645,6 +2815,108 @@ export default function CommunityPage() {
             // Optionally refresh posts
           }}
         />
+      )}
+
+      {/* Translation Language Selection Modal */}
+      {translateModalOpen && (
+        <div 
+          className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"
+          onClick={() => {
+            if (!translating) {
+              setTranslateModalOpen(false);
+              setTranslatePostData(null);
+              setTranslationResult(null);
+            }
+          }}
+        >
+          <div 
+            className="bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
+              <h2 className="text-xl font-semibold text-white">
+                {translationResult ? `Translated to ${translationResult.langName}` : 'View post in'}
+              </h2>
+              <button
+                onClick={() => {
+                  if (!translating) {
+                    setTranslateModalOpen(false);
+                    setTranslatePostData(null);
+                    setTranslationResult(null);
+                  }
+                }}
+                disabled={translating}
+                className="p-2 rounded-full hover:bg-gray-700 transition-colors disabled:opacity-50"
+              >
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+            
+            {/* Content */}
+            <div className="max-h-[60vh] overflow-y-auto">
+              {translating ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className="animate-spin w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full mb-4"></div>
+                  <p className="text-gray-400">Translating...</p>
+                </div>
+              ) : translationResult ? (
+                /* Translation Result View */
+                <div className="p-6 space-y-4">
+                  {/* Translated Title */}
+                  {translationResult.title && (
+                    <div>
+                      <h3 className="text-lg font-bold text-white mb-2">{translationResult.title}</h3>
+                    </div>
+                  )}
+                  
+                  {/* Translated Content */}
+                  {translationResult.content && (
+                    <div className="text-gray-300 leading-relaxed whitespace-pre-wrap">
+                      {translationResult.content}
+                    </div>
+                  )}
+                  
+                  {/* Back button */}
+                  <div className="pt-4 border-t border-gray-700 flex gap-3">
+                    <button
+                      onClick={() => setTranslationResult(null)}
+                      className="flex-1 px-4 py-2.5 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm font-medium"
+                    >
+                      ← Choose another language
+                    </button>
+                    <button
+                      onClick={() => {
+                        setTranslateModalOpen(false);
+                        setTranslatePostData(null);
+                        setTranslationResult(null);
+                      }}
+                      className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                    >
+                      Done
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Language Selection List */
+                <div className="py-2">
+                  {LANGUAGES.map((lang, index) => (
+                    <button
+                      key={lang.code}
+                      onClick={() => handleSelectLanguage(lang.code, lang.name)}
+                      className={`w-full px-6 py-4 text-left text-white hover:bg-gray-800 transition-colors flex items-center justify-between group ${
+                        index !== LANGUAGES.length - 1 ? 'border-b border-gray-700/50' : ''
+                      }`}
+                    >
+                      <span className="text-lg">{lang.native}</span>
+                      <Languages className="w-5 h-5 text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {renderToasts()}

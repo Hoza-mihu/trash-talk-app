@@ -38,6 +38,33 @@ export default function PostDetailPage() {
   const toastSeq = useRef(0);
   const isMounted = useRef(true);
   const toastTimeouts = useRef<ReturnType<typeof setTimeout>[]>([]);
+  
+  // Translation modal state
+  const [translateModalOpen, setTranslateModalOpen] = useState(false);
+  const [translating, setTranslating] = useState(false);
+  const [translationResult, setTranslationResult] = useState<{ title: string; content: string; lang: string; langName: string } | null>(null);
+  
+  // Available languages for translation
+  const LANGUAGES = [
+    { code: 'en', name: 'English', native: 'English' },
+    { code: 'it', name: 'Italian', native: 'Italiano' },
+    { code: 'fr', name: 'French', native: 'Français' },
+    { code: 'es', name: 'Spanish', native: 'Español (Latinoamérica)' },
+    { code: 'th', name: 'Thai', native: 'ไทย' },
+    { code: 'de', name: 'German', native: 'Deutsch' },
+    { code: 'pt', name: 'Portuguese', native: 'Português (Brasil)' },
+    { code: 'hi', name: 'Hindi', native: 'हिन्दी' },
+    { code: 'zh', name: 'Chinese', native: '中文' },
+    { code: 'ja', name: 'Japanese', native: '日本語' },
+    { code: 'ko', name: 'Korean', native: '한국어' },
+    { code: 'ar', name: 'Arabic', native: 'العربية' },
+    { code: 'ru', name: 'Russian', native: 'Русский' },
+    { code: 'nl', name: 'Dutch', native: 'Nederlands' },
+    { code: 'pl', name: 'Polish', native: 'Polski' },
+    { code: 'tr', name: 'Turkish', native: 'Türkçe' },
+    { code: 'vi', name: 'Vietnamese', native: 'Tiếng Việt' },
+    { code: 'id', name: 'Indonesian', native: 'Bahasa Indonesia' },
+  ];
 
   const showToast = (text: string, tone: 'success' | 'error' | 'info' = 'info') => {
     toastSeq.current += 1;
@@ -349,14 +376,31 @@ export default function PostDetailPage() {
     }
   };
 
-  const handleTranslatePost = async () => {
+  // Open translation modal
+  const handleTranslatePost = () => {
     if (!user || !community || !post) {
       showToast('Please sign in to translate posts.', 'error');
       return;
     }
-    const lang = prompt('Enter target language code (e.g., en, es, fr):', 'en') || 'en';
+    setTranslateModalOpen(true);
+    setActionMenuOpen(false);
+  };
+  
+  // Handle language selection and translate
+  const handleSelectLanguage = async (langCode: string, langName: string) => {
+    if (!user || !community || !post) {
+      return;
+    }
+    
+    setTranslating(true);
+    
     try {
-      await translatePostContent(postId, lang, { title: post.title, content: post.content });
+      const translation = await translatePostContent(
+        postId, 
+        langCode, 
+        { title: post.title, content: post.content }
+      );
+      
       await setPostAction(user.uid, postId, { communityId: community.id, translated: true });
       setPostActionState((prev) => ({
         ...(prev || { postId, communityId: community.id }),
@@ -365,11 +409,26 @@ export default function PostDetailPage() {
         translated: true,
         updatedAt: new Date()
       }));
-      showToast(`Translation cached (${lang}).`, 'success');
+      
+      // Show translation result in the modal
+      const lang = LANGUAGES.find(l => l.code === langCode);
+      setTranslationResult({
+        title: translation.title || post.title || '',
+        content: translation.content || post.content || '',
+        lang: langCode,
+        langName: lang?.native || langName
+      });
+      
+      showToast(`Translated to ${langName} successfully!`, 'success');
     } catch (error: any) {
-      showToast(error?.message || 'Translation failed.', 'error');
+      setTranslateModalOpen(false);
+      if (error?.message?.includes('unavailable') || error?.message?.includes('not available')) {
+        showToast('Translation service is coming soon.', 'info');
+      } else {
+        showToast(error?.message || 'Translation failed.', 'error');
+      }
     } finally {
-      setActionMenuOpen(false);
+      setTranslating(false);
     }
   };
 
@@ -841,6 +900,107 @@ export default function PostDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Translation Language Selection Modal */}
+      {translateModalOpen && (
+        <div 
+          className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"
+          onClick={() => {
+            if (!translating) {
+              setTranslateModalOpen(false);
+              setTranslationResult(null);
+            }
+          }}
+        >
+          <div 
+            className="bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
+              <h2 className="text-xl font-semibold text-white">
+                {translationResult ? `Translated to ${translationResult.langName}` : 'View post in'}
+              </h2>
+              <button
+                onClick={() => {
+                  if (!translating) {
+                    setTranslateModalOpen(false);
+                    setTranslationResult(null);
+                  }
+                }}
+                disabled={translating}
+                className="p-2 rounded-full hover:bg-gray-700 transition-colors disabled:opacity-50"
+              >
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            {/* Content */}
+            <div className="max-h-[60vh] overflow-y-auto">
+              {translating ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className="animate-spin w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full mb-4"></div>
+                  <p className="text-gray-400">Translating...</p>
+                </div>
+              ) : translationResult ? (
+                /* Translation Result View */
+                <div className="p-6 space-y-4">
+                  {/* Translated Title */}
+                  {translationResult.title && (
+                    <div>
+                      <h3 className="text-lg font-bold text-white mb-2">{translationResult.title}</h3>
+                    </div>
+                  )}
+                  
+                  {/* Translated Content */}
+                  {translationResult.content && (
+                    <div className="text-gray-300 leading-relaxed whitespace-pre-wrap">
+                      {translationResult.content}
+                    </div>
+                  )}
+                  
+                  {/* Back button */}
+                  <div className="pt-4 border-t border-gray-700 flex gap-3">
+                    <button
+                      onClick={() => setTranslationResult(null)}
+                      className="flex-1 px-4 py-2.5 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm font-medium"
+                    >
+                      ← Choose another language
+                    </button>
+                    <button
+                      onClick={() => {
+                        setTranslateModalOpen(false);
+                        setTranslationResult(null);
+                      }}
+                      className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                    >
+                      Done
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Language Selection List */
+                <div className="py-2">
+                  {LANGUAGES.map((lang, index) => (
+                    <button
+                      key={lang.code}
+                      onClick={() => handleSelectLanguage(lang.code, lang.name)}
+                      className={`w-full px-6 py-4 text-left text-white hover:bg-gray-800 transition-colors flex items-center justify-between group ${
+                        index !== LANGUAGES.length - 1 ? 'border-b border-gray-700/50' : ''
+                      }`}
+                    >
+                      <span className="text-lg">{lang.native}</span>
+                      <Languages className="w-5 h-5 text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {renderToasts()}
     </div>

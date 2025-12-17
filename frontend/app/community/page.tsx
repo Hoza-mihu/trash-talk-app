@@ -331,29 +331,29 @@ export default function CommunityPage() {
                   Your Communities
                 </h3>
                 <div className="space-y-2">
-                  {userCommunities.map((community) => (
-                    <Link
-                      key={community.id}
-                      href={`/community/c/${community.id}`}
-                      className="block p-3 rounded-lg hover:bg-green-50 transition-colors border border-transparent hover:border-green-200"
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        {community.iconUrl || community.imageUrl ? (
-                          <img
-                            src={community.iconUrl || community.imageUrl}
-                            alt={community.name}
-                            className="w-8 h-8 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                            {community.name.charAt(0).toUpperCase()}
+                    {userCommunities.map((community) => (
+                      <Link
+                        key={community.id}
+                        href={`/community/c/${community.id}`}
+                        className="block p-3 rounded-lg hover:bg-green-50 transition-colors border border-transparent hover:border-green-200"
+                      >
+                        <div className="flex items-center gap-2 mb-2">
+                          {(community.iconUrl && community.iconUrl.trim() !== '') || (community.imageUrl && community.imageUrl.trim() !== '') ? (
+                            <img
+                              src={community.iconUrl || community.imageUrl}
+                              alt={community.name}
+                              className="w-8 h-8 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                              {community.name.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-gray-900 truncate">r/{community.name}</p>
+                            <p className="text-xs text-gray-500">{community.memberCount} members</p>
                           </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-gray-900 truncate">r/{community.name}</p>
-                          <p className="text-xs text-gray-500">{community.memberCount} members</p>
                         </div>
-                      </div>
                       {/* Weekly Stats */}
                       {(community.weeklyVisitors !== undefined || community.weeklyContributions !== undefined) && (
                         <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-100">
@@ -409,7 +409,7 @@ export default function CommunityPage() {
                         className="p-3 rounded-lg hover:bg-green-50 transition-colors border border-transparent hover:border-green-200"
                       >
                         <div className="flex items-center gap-2 mb-2">
-                          {community.iconUrl || community.imageUrl ? (
+                          {(community.iconUrl && community.iconUrl.trim() !== '') || (community.imageUrl && community.imageUrl.trim() !== '') ? (
                             <img
                               src={community.iconUrl || community.imageUrl}
                               alt={community.name}
