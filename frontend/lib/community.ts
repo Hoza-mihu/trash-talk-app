@@ -1417,25 +1417,80 @@ export async function getPostTranslation(postId: string, lang: string): Promise<
 }
 
 // Helper function to translate text using MyMemory API (free, no API key needed)
-async function translateText(text: string, targetLang: string, sourceLang: string = 'en'): Promise<string> {
+async function translateText(text: string, targetLang: string, sourceLang: string = 'auto'): Promise<string> {
   if (!text || text.trim() === '') return text;
+
+  // MyMemory has a 500 char limit per request, so we need to chunk long text
+  const maxChunkSize = 450;
   
   try {
-    const response = await fetch(
-      `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLang}|${targetLang}`
-    );
-    const data = await response.json();
-    
-    if (data.responseStatus === 200 && data.responseData?.translatedText) {
-      return data.responseData.translatedText;
+    // For short text, translate directly
+    if (text.length <= maxChunkSize) {
+      const response = await fetch(
+        `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLang}|${targetLang}`
+      );
+      const data = await response.json();
+
+      console.log('Translation API response:', data);
+
+      if (data.responseStatus === 200 && data.responseData?.translatedText) {
+        const translated = data.responseData.translatedText;
+        // Check if it's actually translated (not an error message)
+        if (!translated.includes('MYMEMORY WARNING') && 
+            !translated.includes('QUERY LENGTH LIMIT') &&
+            translated !== text) {
+          return translated;
+        }
+      }
+      
+      // If translation failed or returned same text, try alternative
+      console.log('MyMemory failed, trying LibreTranslate...');
+      return await translateWithLibre(text, targetLang, sourceLang);
     }
-    
-    // If API fails, return original text
-    return text;
+
+    // For long text, split into sentences and translate each
+    const sentences = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [text];
+    const translatedParts: string[] = [];
+
+    for (const sentence of sentences) {
+      if (sentence.trim()) {
+        const translated = await translateText(sentence.trim(), targetLang, sourceLang);
+        translatedParts.push(translated);
+      }
+    }
+
+    return translatedParts.join(' ');
   } catch (error) {
     console.warn('Translation API error:', error);
-    return text;
+    // Try alternative API
+    return await translateWithLibre(text, targetLang, sourceLang);
   }
+}
+
+// Alternative translation using Google Translate (unofficial API)
+async function translateWithLibre(text: string, targetLang: string, sourceLang: string = 'auto'): Promise<string> {
+  try {
+    // Use Google Translate's unofficial API endpoint
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sourceLang === 'auto' ? 'auto' : sourceLang}&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
+    
+    const response = await fetch(url);
+    
+    if (response.ok) {
+      const data = await response.json();
+      // Google returns array format: [[["translated text","original text",null,null,1]],null,"en"]
+      if (data && data[0] && Array.isArray(data[0])) {
+        const translatedText = data[0].map((item: any) => item[0]).join('');
+        if (translatedText && translatedText !== text) {
+          return translatedText;
+        }
+      }
+    }
+  } catch (error) {
+    console.warn('Google Translate failed:', error);
+  }
+
+  // Last resort: return original text
+  return text;
 }
 
 export async function translatePostContent(
@@ -1443,9 +1498,18 @@ export async function translatePostContent(
   targetLang: string,
   payload: { title?: string; content?: string }
 ): Promise<PostTranslation> {
-  // Check cache first
+  // Check cache first - but only use if translation is different from original
   const cached = await getPostTranslation(postId, targetLang);
-  if (cached && !cached.isFallback) return cached;
+  if (cached && !cached.isFallback) {
+    // Verify cached translation is actually different from original
+    const titleChanged = !payload.title || cached.title !== payload.title;
+    const contentChanged = !payload.content || cached.content !== payload.content;
+    if (titleChanged || contentChanged) {
+      return cached;
+    }
+    // If cached is same as original, re-translate
+    console.log('Cached translation same as original, re-translating...');
+  }
 
   try {
     // First try using Firebase Cloud Function for translation (if available)
