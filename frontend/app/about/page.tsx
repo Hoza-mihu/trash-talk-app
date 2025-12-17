@@ -1,8 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useState, useEffect, useRef } from 'react';
 import { Leaf, Recycle, BarChart3, ArrowLeft, Sparkles, Target, Users, TrendingUp, Award, Zap, Globe, Heart } from 'lucide-react';
+import profileImg from '@/images/profile.jpg';
 
 export default function AboutPage() {
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
@@ -219,8 +221,14 @@ export default function AboutPage() {
           <div className="relative z-10">
             <div className="flex flex-col md:flex-row items-center gap-8">
               <div className="relative group">
-                <div className="w-32 h-32 bg-white/20 rounded-full flex items-center justify-center text-white text-4xl font-bold shadow-2xl backdrop-blur-sm group-hover:scale-125 group-hover:rotate-12 transition-all duration-500 cursor-pointer">
-                  HM
+                <div className="w-32 h-32 rounded-full overflow-hidden shadow-2xl ring-4 ring-white/30 backdrop-blur-sm group-hover:scale-125 group-hover:rotate-3 transition-all duration-500 cursor-pointer">
+                  <Image
+                    src={profileImg}
+                    alt="Hoza Mihu"
+                    className="object-cover w-full h-full"
+                    priority
+                    sizes="128px"
+                  />
                 </div>
                 <div className="absolute -top-2 -right-2 w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center animate-bounce shadow-lg">
                   <Award className="w-6 h-6 text-yellow-900" />
