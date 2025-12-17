@@ -44,6 +44,11 @@ export default function PostDetailPage() {
   const [translating, setTranslating] = useState(false);
   const [translationResult, setTranslationResult] = useState<{ title: string; content: string; lang: string; langName: string } | null>(null);
   
+  // State to display translated content on the post itself (like Reddit)
+  const [displayedTitle, setDisplayedTitle] = useState<string | null>(null);
+  const [displayedContent, setDisplayedContent] = useState<string | null>(null);
+  const [currentLanguage, setCurrentLanguage] = useState<string | null>(null); // null = original
+  
   // Available languages for translation
   const LANGUAGES = [
     { code: 'en', name: 'English', native: 'English' },
@@ -410,16 +415,18 @@ export default function PostDetailPage() {
         updatedAt: new Date()
       }));
       
-      // Show translation result in the modal
       const lang = LANGUAGES.find(l => l.code === langCode);
-      setTranslationResult({
-        title: translation.title || post.title || '',
-        content: translation.content || post.content || '',
-        lang: langCode,
-        langName: lang?.native || langName
-      });
       
-      showToast(`Translated to ${langName} successfully!`, 'success');
+      // Apply translation to the post display (like Reddit)
+      setDisplayedTitle(translation.title || post.title || '');
+      setDisplayedContent(translation.content || post.content || '');
+      setCurrentLanguage(lang?.native || langName);
+      
+      // Close the modal
+      setTranslateModalOpen(false);
+      setTranslationResult(null);
+      
+      showToast(`Viewing in ${lang?.native || langName}`, 'success');
     } catch (error: any) {
       setTranslateModalOpen(false);
       if (error?.message?.includes('unavailable') || error?.message?.includes('not available')) {
@@ -430,6 +437,14 @@ export default function PostDetailPage() {
     } finally {
       setTranslating(false);
     }
+  };
+  
+  // Reset to original language
+  const handleShowOriginal = () => {
+    setDisplayedTitle(null);
+    setDisplayedContent(null);
+    setCurrentLanguage(null);
+    showToast('Showing original post', 'info');
   };
 
   const handleReportPost = async () => {
@@ -671,19 +686,39 @@ export default function PostDetailPage() {
               <span className="text-xs text-gray-400">•</span>
               <span className="text-xs text-gray-500">{formatDate(post.createdAt)}</span>
             </div>
+            
+            {/* Translation indicator banner */}
+            {currentLanguage && (
+              <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 mb-3">
+                <div className="flex items-center gap-2">
+                  <Languages className="w-4 h-4 text-blue-600" />
+                  <span className="text-sm text-blue-800">
+                    Translated to <strong>{currentLanguage}</strong>
+                  </span>
+                </div>
+                <button
+                  onClick={handleShowOriginal}
+                  className="text-sm text-blue-600 hover:text-blue-800 font-medium hover:underline"
+                >
+                  Show original
+                </button>
+              </div>
+            )}
 
-            {/* Title */}
-            <h1 className="text-lg font-semibold text-gray-900 mb-3">{post.title}</h1>
+            {/* Title - show translated or original */}
+            <h1 className="text-lg font-semibold text-gray-900 mb-3">
+              {displayedTitle || post.title}
+            </h1>
 
             {/* Media */}
             {post.imageUrl && (
-              <img src={post.imageUrl} alt={post.title || 'Post image'} className="w-full rounded-md mb-3 max-h-[600px] object-contain" />
+              <img src={post.imageUrl} alt={displayedTitle || post.title || 'Post image'} className="w-full rounded-md mb-3 max-h-[600px] object-contain" />
             )}
 
-            {/* Body */}
-            {post.content && (
+            {/* Body - show translated or original */}
+            {(displayedContent || post.content) && (
               <div className="text-gray-700 text-sm leading-relaxed whitespace-pre-line mb-3">
-                {post.content}
+                {displayedContent || post.content}
               </div>
             )}
 
@@ -789,13 +824,23 @@ export default function PostDetailPage() {
                         <EyeOff className="w-4 h-4 text-gray-500" />
                         {postActionState?.hidden ? 'Unhide' : 'Hide'}
                       </button>
-                      <button
-                        onClick={(e) => { e.preventDefault(); handleTranslatePost(); }}
-                        className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left"
-                      >
-                        <Languages className="w-4 h-4 text-green-600" />
-                        {postActionState?.translated ? 'View translation' : 'View in other languages'}
-                      </button>
+                      {currentLanguage ? (
+                        <button
+                          onClick={(e) => { e.preventDefault(); handleShowOriginal(); setActionMenuOpen(false); }}
+                          className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left"
+                        >
+                          <Languages className="w-4 h-4 text-green-600" />
+                          Show original
+                        </button>
+                      ) : (
+                        <button
+                          onClick={(e) => { e.preventDefault(); handleTranslatePost(); }}
+                          className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left"
+                        >
+                          <Languages className="w-4 h-4 text-green-600" />
+                          View in other languages
+                        </button>
+                      )}
                       <button
                         onClick={(e) => { e.preventDefault(); handleReportPost(); }}
                         className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left"
@@ -943,42 +988,6 @@ export default function PostDetailPage() {
                 <div className="flex flex-col items-center justify-center py-12">
                   <div className="animate-spin w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full mb-4"></div>
                   <p className="text-gray-400">Translating...</p>
-                </div>
-              ) : translationResult ? (
-                /* Translation Result View */
-                <div className="p-6 space-y-4">
-                  {/* Translated Title */}
-                  {translationResult.title && (
-                    <div>
-                      <h3 className="text-lg font-bold text-white mb-2">{translationResult.title}</h3>
-                    </div>
-                  )}
-                  
-                  {/* Translated Content */}
-                  {translationResult.content && (
-                    <div className="text-gray-300 leading-relaxed whitespace-pre-wrap">
-                      {translationResult.content}
-                    </div>
-                  )}
-                  
-                  {/* Back button */}
-                  <div className="pt-4 border-t border-gray-700 flex gap-3">
-                    <button
-                      onClick={() => setTranslationResult(null)}
-                      className="flex-1 px-4 py-2.5 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm font-medium"
-                    >
-                      ← Choose another language
-                    </button>
-                    <button
-                      onClick={() => {
-                        setTranslateModalOpen(false);
-                        setTranslationResult(null);
-                      }}
-                      className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
-                    >
-                      Done
-                    </button>
-                  </div>
                 </div>
               ) : (
                 /* Language Selection List */
