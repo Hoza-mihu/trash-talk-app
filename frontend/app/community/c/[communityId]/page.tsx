@@ -122,7 +122,9 @@ export default function CommunityPage() {
   const [translateModalOpen, setTranslateModalOpen] = useState(false);
   const [translatePostData, setTranslatePostData] = useState<{ postId: string; title?: string; content?: string } | null>(null);
   const [translating, setTranslating] = useState(false);
-  const [translationResult, setTranslationResult] = useState<{ title: string; content: string; lang: string; langName: string } | null>(null);
+  
+  // Track translations per post (postId -> { title, content, langName })
+  const [postTranslations, setPostTranslations] = useState<Record<string, { title: string; content: string; langName: string }>>({});
   
   // Available languages for translation
   const LANGUAGES = [
@@ -877,16 +879,22 @@ export default function CommunityPage() {
         }
       }));
       
-      // Show translation result in the modal
+      // Update the post display with translation (like Reddit)
       const lang = LANGUAGES.find(l => l.code === langCode);
-      setTranslationResult({
-        title: translation.title || translatePostData.title || '',
-        content: translation.content || translatePostData.content || '',
-        lang: langCode,
-        langName: lang?.native || langName
-      });
+      setPostTranslations((prev) => ({
+        ...prev,
+        [translatePostData.postId]: {
+          title: translation.title || translatePostData.title || '',
+          content: translation.content || translatePostData.content || '',
+          langName: lang?.native || langName
+        }
+      }));
       
-      showToast(`Translated to ${langName} successfully!`, 'success');
+      // Close the modal
+      setTranslateModalOpen(false);
+      setTranslatePostData(null);
+      
+      showToast(`Viewing in ${lang?.native || langName}`, 'success');
     } catch (error: any) {
       setTranslateModalOpen(false);
       setTranslatePostData(null);
@@ -898,6 +906,16 @@ export default function CommunityPage() {
     } finally {
       setTranslating(false);
     }
+  };
+  
+  // Reset post to original language
+  const handleShowOriginalPost = (postId: string) => {
+    setPostTranslations((prev) => {
+      const newTranslations = { ...prev };
+      delete newTranslations[postId];
+      return newTranslations;
+    });
+    showToast('Showing original post', 'info');
   };
 
   const handleReportPost = async (postId: string) => {
@@ -2008,8 +2026,25 @@ export default function CommunityPage() {
                                   <span className="text-xs text-gray-400">•</span>
                                   <span className="text-xs text-gray-500">{formatDate(post.createdAt)}</span>
                                 </div>
+                                {/* Translation banner */}
+                                {postTranslations[post.id!] && (
+                                  <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg px-2 py-1.5 mb-2">
+                                    <div className="flex items-center gap-1.5">
+                                      <Languages className="w-3.5 h-3.5 text-blue-600" />
+                                      <span className="text-xs text-blue-800">
+                                        Translated to <strong>{postTranslations[post.id!].langName}</strong>
+                                      </span>
+                                    </div>
+                                    <button
+                                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleShowOriginalPost(post.id!); }}
+                                      className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline"
+                                    >
+                                      Show original
+                                    </button>
+                                  </div>
+                                )}
                                 <h3 className="text-base font-semibold text-gray-900 mb-2 line-clamp-2 hover:text-green-600 transition-colors">
-                                  {post.title}
+                                  {postTranslations[post.id!]?.title || post.title}
                                 </h3>
                                 {viewOption === 'card' && post.imageUrl && (
                                   <div className="mb-2">
@@ -2235,13 +2270,23 @@ export default function CommunityPage() {
                                         <EyeOff className="w-4 h-4 text-gray-500" />
                                         {postActions[post.id!]?.hidden ? 'Unhide' : 'Hide'}
                                       </button>
-                                      <button
-                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleTranslatePost(post.id!, post.title, post.content); }}
-                                        className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left"
-                                      >
-                                        <Languages className="w-4 h-4 text-green-600" />
-                                        View in other languages
-                                      </button>
+                                      {postTranslations[post.id!] ? (
+                                        <button
+                                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleShowOriginalPost(post.id!); setPostMenuOpenId(null); }}
+                                          className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left"
+                                        >
+                                          <Languages className="w-4 h-4 text-green-600" />
+                                          Show original
+                                        </button>
+                                      ) : (
+                                        <button
+                                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleTranslatePost(post.id!, post.title, post.content); }}
+                                          className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left"
+                                        >
+                                          <Languages className="w-4 h-4 text-green-600" />
+                                          View in other languages
+                                        </button>
+                                      )}
                                       <button
                                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleReportPost(post.id!); }}
                                         className="w-full px-3 py-2 flex items-center gap-2 hover:bg-gray-50 text-left"
@@ -2825,7 +2870,6 @@ export default function CommunityPage() {
             if (!translating) {
               setTranslateModalOpen(false);
               setTranslatePostData(null);
-              setTranslationResult(null);
             }
           }}
         >
@@ -2835,15 +2879,12 @@ export default function CommunityPage() {
           >
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
-              <h2 className="text-xl font-semibold text-white">
-                {translationResult ? `Translated to ${translationResult.langName}` : 'View post in'}
-              </h2>
+              <h2 className="text-xl font-semibold text-white">View post in</h2>
               <button
                 onClick={() => {
                   if (!translating) {
                     setTranslateModalOpen(false);
                     setTranslatePostData(null);
-                    setTranslationResult(null);
                   }
                 }}
                 disabled={translating}
@@ -2859,43 +2900,6 @@ export default function CommunityPage() {
                 <div className="flex flex-col items-center justify-center py-12">
                   <div className="animate-spin w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full mb-4"></div>
                   <p className="text-gray-400">Translating...</p>
-                </div>
-              ) : translationResult ? (
-                /* Translation Result View */
-                <div className="p-6 space-y-4">
-                  {/* Translated Title */}
-                  {translationResult.title && (
-                    <div>
-                      <h3 className="text-lg font-bold text-white mb-2">{translationResult.title}</h3>
-                    </div>
-                  )}
-                  
-                  {/* Translated Content */}
-                  {translationResult.content && (
-                    <div className="text-gray-300 leading-relaxed whitespace-pre-wrap">
-                      {translationResult.content}
-                    </div>
-                  )}
-                  
-                  {/* Back button */}
-                  <div className="pt-4 border-t border-gray-700 flex gap-3">
-                    <button
-                      onClick={() => setTranslationResult(null)}
-                      className="flex-1 px-4 py-2.5 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm font-medium"
-                    >
-                      ← Choose another language
-                    </button>
-                    <button
-                      onClick={() => {
-                        setTranslateModalOpen(false);
-                        setTranslatePostData(null);
-                        setTranslationResult(null);
-                      }}
-                      className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
-                    >
-                      Done
-                    </button>
-                  </div>
                 </div>
               ) : (
                 /* Language Selection List */
