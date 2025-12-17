@@ -37,6 +37,7 @@ export default function PostDetailPage() {
   const actionMenuRef = useRef<HTMLDivElement>(null);
   const toastSeq = useRef(0);
   const isMounted = useRef(true);
+  const toastTimeouts = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const showToast = (text: string, tone: 'success' | 'error' | 'info' = 'info') => {
     toastSeq.current += 1;
@@ -45,8 +46,9 @@ export default function PostDetailPage() {
     const timeout = setTimeout(() => {
       if (!isMounted.current) return;
       setToasts((prev) => prev.filter((toast) => toast.id !== id));
+      toastTimeouts.current = toastTimeouts.current.filter((t) => t !== timeout);
     }, 2500);
-    return () => clearTimeout(timeout);
+    toastTimeouts.current.push(timeout);
   };
 
   const renderToasts = () =>
@@ -97,6 +99,8 @@ export default function PostDetailPage() {
   useEffect(() => {
     return () => {
       isMounted.current = false;
+      toastTimeouts.current.forEach(clearTimeout);
+      toastTimeouts.current = [];
     };
   }, []);
 
