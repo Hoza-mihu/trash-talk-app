@@ -338,9 +338,17 @@ export default function CommunityPage() {
                       className="block p-3 rounded-lg hover:bg-green-50 transition-colors border border-transparent hover:border-green-200"
                     >
                       <div className="flex items-center gap-2 mb-2">
-                        <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                          {community.name.charAt(0).toUpperCase()}
-                        </div>
+                        {community.iconUrl || community.imageUrl ? (
+                          <img
+                            src={community.iconUrl || community.imageUrl}
+                            alt={community.name}
+                            className="w-8 h-8 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                            {community.name.charAt(0).toUpperCase()}
+                          </div>
+                        )}
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-gray-900 truncate">r/{community.name}</p>
                           <p className="text-xs text-gray-500">{community.memberCount} members</p>
@@ -401,9 +409,17 @@ export default function CommunityPage() {
                         className="p-3 rounded-lg hover:bg-green-50 transition-colors border border-transparent hover:border-green-200"
                       >
                         <div className="flex items-center gap-2 mb-2">
-                          <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                            {community.name.charAt(0).toUpperCase()}
-                          </div>
+                          {community.iconUrl || community.imageUrl ? (
+                            <img
+                              src={community.iconUrl || community.imageUrl}
+                              alt={community.name}
+                              className="w-8 h-8 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                              {community.name.charAt(0).toUpperCase()}
+                            </div>
+                          )}
                           <div className="flex-1 min-w-0">
                             <Link
                               href={`/community/c/${community.id}`}

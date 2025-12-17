@@ -117,7 +117,6 @@ export default function CommunityPage() {
   const [toasts, setToasts] = useState<{ id: number; text: string; tone?: 'success' | 'error' | 'info' }[]>([]);
   const toastSeq = useRef(0);
   const isMounted = useRef(true);
-  const toastTimeouts = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const showToast = (text: string, tone: 'success' | 'error' | 'info' = 'info') => {
     toastSeq.current += 1;
@@ -126,9 +125,8 @@ export default function CommunityPage() {
     const timeout = setTimeout(() => {
       if (!isMounted.current) return;
       setToasts((prev) => prev.filter((toast) => toast.id !== id));
-      toastTimeouts.current = toastTimeouts.current.filter((t) => t !== timeout);
     }, 2500);
-    toastTimeouts.current.push(timeout);
+    return () => clearTimeout(timeout);
   };
 
   useEffect(() => {
@@ -138,8 +136,6 @@ export default function CommunityPage() {
   useEffect(() => {
     return () => {
       isMounted.current = false;
-      toastTimeouts.current.forEach(clearTimeout);
-      toastTimeouts.current = [];
     };
   }, []);
 
