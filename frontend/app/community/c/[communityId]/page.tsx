@@ -114,17 +114,50 @@ export default function CommunityPage() {
   const [postMenuOpenId, setPostMenuOpenId] = useState<string | null>(null);
   const [postActions, setPostActions] = useState<Record<string, PostAction>>({});
   const postActionsRef = useRef<Record<string, PostAction>>({});
-  const [toast, setToast] = useState<{ id: number; text: string; tone?: 'success' | 'error' | 'info' } | null>(null);
+  const [toasts, setToasts] = useState<{ id: number; text: string; tone?: 'success' | 'error' | 'info' }[]>([]);
   const toastSeq = useRef(0);
+  const isMounted = useRef(true);
 
   const showToast = (text: string, tone: 'success' | 'error' | 'info' = 'info') => {
     toastSeq.current += 1;
-    setToast({ id: toastSeq.current, text, tone });
+    const id = toastSeq.current;
+    setToasts((prev) => [...prev, { id, text, tone }]);
+    const timeout = setTimeout(() => {
+      if (!isMounted.current) return;
+      setToasts((prev) => prev.filter((toast) => toast.id !== id));
+    }, 2500);
+    return () => clearTimeout(timeout);
   };
 
   useEffect(() => {
     postActionsRef.current = postActions;
   }, [postActions]);
+
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  const renderToasts = () =>
+    toasts.length > 0 && (
+      <div className="fixed bottom-4 right-4 z-50 space-y-2" role="status" aria-live="polite">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`text-sm font-medium px-4 py-2 rounded-full shadow-lg text-white ${
+              toast.tone === 'error'
+                ? 'bg-red-600'
+                : toast.tone === 'success'
+                  ? 'bg-emerald-600'
+                  : 'bg-gray-900'
+            }`}
+          >
+            {toast.text}
+          </div>
+        ))}
+      </div>
+    );
 
   useEffect(() => {
     if (communityId) {
@@ -803,12 +836,6 @@ export default function CommunityPage() {
     }
   };
 
-  useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToast(null), 2500);
-    return () => clearTimeout(timer);
-  }, [toast?.id]);
-
   const handleDeleteCommunity = async () => {
     if (!user || !community) return;
     
@@ -1096,21 +1123,7 @@ export default function CommunityPage() {
           <div className="animate-spin w-12 h-12 border-4 border-green-600 border-t-transparent rounded-full mx-auto mb-4"></div>
           <p className="text-gray-600">Loading community...</p>
         </div>
-      {toast && (
-        <div className="fixed bottom-4 right-4 z-50" role="status" aria-live="polite">
-          <div
-            className={`text-sm font-medium px-4 py-2 rounded-full shadow-lg text-white ${
-              toast.tone === 'error'
-                ? 'bg-red-600'
-                : toast.tone === 'success'
-                  ? 'bg-emerald-600'
-                  : 'bg-gray-900'
-            }`}
-          >
-            {toast.text}
-          </div>
-        </div>
-      )}
+      {renderToasts()}
       </div>
     );
   }
@@ -2634,13 +2647,7 @@ export default function CommunityPage() {
         />
       )}
 
-      {statusMessage && (
-        <div className="fixed bottom-4 right-4 z-50">
-          <div className="bg-gray-900 text-white text-sm font-medium px-4 py-2 rounded-full shadow-lg">
-            {statusMessage}
-          </div>
-        </div>
-      )}
+      {renderToasts()}
     </div>
   );
 }

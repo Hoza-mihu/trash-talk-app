@@ -33,14 +33,41 @@ export default function PostDetailPage() {
   const awardsMenuRef = useRef<HTMLDivElement>(null);
   const [postActionState, setPostActionState] = useState<PostAction | null>(null);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
-  const [toast, setToast] = useState<{ id: number; text: string; tone?: 'success' | 'error' | 'info' } | null>(null);
+  const [toasts, setToasts] = useState<{ id: number; text: string; tone?: 'success' | 'error' | 'info' }[]>([]);
   const actionMenuRef = useRef<HTMLDivElement>(null);
   const toastSeq = useRef(0);
+  const isMounted = useRef(true);
 
   const showToast = (text: string, tone: 'success' | 'error' | 'info' = 'info') => {
     toastSeq.current += 1;
-    setToast({ id: toastSeq.current, text, tone });
+    const id = toastSeq.current;
+    setToasts((prev) => [...prev, { id, text, tone }]);
+    const timeout = setTimeout(() => {
+      if (!isMounted.current) return;
+      setToasts((prev) => prev.filter((toast) => toast.id !== id));
+    }, 2500);
+    return () => clearTimeout(timeout);
   };
+
+  const renderToasts = () =>
+    toasts.length > 0 && (
+      <div className="fixed bottom-4 right-4 z-50 space-y-2" role="status" aria-live="polite">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`text-sm font-medium px-4 py-2 rounded-full shadow-lg text-white ${
+              toast.tone === 'error'
+                ? 'bg-red-600'
+                : toast.tone === 'success'
+                  ? 'bg-emerald-600'
+                  : 'bg-gray-900'
+            }`}
+          >
+            {toast.text}
+          </div>
+        ))}
+      </div>
+    );
 
   useEffect(() => {
     if (postId) {
@@ -68,10 +95,10 @@ export default function PostDetailPage() {
   }, [showAwardsMenu, actionMenuOpen]);
 
   useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToast(null), 2500);
-    return () => clearTimeout(timer);
-  }, [toast?.id]);
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!user || !community?.id) return;
@@ -811,21 +838,7 @@ export default function PostDetailPage() {
         </div>
       </div>
 
-      {toast && (
-        <div className="fixed bottom-4 right-4 z-50" role="status" aria-live="polite">
-          <div
-            className={`text-sm font-medium px-4 py-2 rounded-full shadow-lg text-white ${
-              toast.tone === 'error'
-                ? 'bg-red-600'
-                : toast.tone === 'success'
-                  ? 'bg-emerald-600'
-                  : 'bg-gray-900'
-            }`}
-          >
-            {toast.text}
-          </div>
-        </div>
-      )}
+      {renderToasts()}
     </div>
   );
 }
