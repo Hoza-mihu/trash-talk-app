@@ -1417,8 +1417,13 @@ export async function getPostTranslation(postId: string, lang: string): Promise<
 }
 
 // Helper function to translate text using MyMemory API (free, no API key needed)
-async function translateText(text: string, targetLang: string, sourceLang: string = 'auto'): Promise<string> {
+async function translateText(text: string, targetLang: string, sourceLang: string = 'en'): Promise<string> {
   if (!text || text.trim() === '') return text;
+  
+  // If source and target are the same, return original
+  if (sourceLang === targetLang || (sourceLang === 'auto' && targetLang === 'en')) {
+    return text;
+  }
 
   // MyMemory has a 500 char limit per request, so we need to chunk long text
   const maxChunkSize = 450;
@@ -1426,8 +1431,10 @@ async function translateText(text: string, targetLang: string, sourceLang: strin
   try {
     // For short text, translate directly
     if (text.length <= maxChunkSize) {
+      // MyMemory works better with explicit source language
+      const effectiveSourceLang = sourceLang === 'auto' ? 'en' : sourceLang;
       const response = await fetch(
-        `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLang}|${targetLang}`
+        `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${effectiveSourceLang}|${targetLang}`
       );
       const data = await response.json();
 
@@ -1443,9 +1450,15 @@ async function translateText(text: string, targetLang: string, sourceLang: strin
         }
       }
       
-      // If translation failed or returned same text, try alternative
-      console.log('MyMemory failed, trying LibreTranslate...');
-      return await translateWithLibre(text, targetLang, sourceLang);
+      // If translation failed or returned same text, try Google Translate
+      console.log('MyMemory failed or returned same text, trying Google Translate...');
+      try {
+        return await translateWithLibre(text, targetLang, sourceLang);
+      } catch (error) {
+        console.error('All translation APIs failed');
+        // Return original text as last resort, but caller should check if it changed
+        return text;
+      }
     }
 
     // For long text, split into sentences and translate each
@@ -1477,19 +1490,33 @@ async function translateWithLibre(text: string, targetLang: string, sourceLang: 
     
     if (response.ok) {
       const data = await response.json();
+      console.log('Google Translate response:', data);
+      
       // Google returns array format: [[["translated text","original text",null,null,1]],null,"en"]
-      if (data && data[0] && Array.isArray(data[0])) {
-        const translatedText = data[0].map((item: any) => item[0]).join('');
-        if (translatedText && translatedText !== text) {
+      if (data && Array.isArray(data) && data[0] && Array.isArray(data[0])) {
+        let translatedText = '';
+        for (const item of data[0]) {
+          if (Array.isArray(item) && item[0]) {
+            translatedText += item[0];
+          }
+        }
+        
+        if (translatedText && translatedText.trim() !== '' && translatedText !== text) {
+          console.log(`Translation successful: "${text}" -> "${translatedText}"`);
           return translatedText;
+        } else {
+          console.warn('Google Translate returned same or empty text');
         }
       }
+    } else {
+      console.warn('Google Translate API error:', response.status, response.statusText);
     }
   } catch (error) {
     console.warn('Google Translate failed:', error);
   }
 
-  // Last resort: return original text
+  // Last resort: return original text (caller should check if it changed)
+  console.warn('All translation APIs failed, returning original text');
   return text;
 }
 
@@ -1542,11 +1569,21 @@ export async function translatePostContent(
     const translatedTitle = payload.title ? await translateText(payload.title, targetLang) : '';
     const translatedContent = payload.content ? await translateText(payload.content, targetLang) : '';
 
+    // Verify that translation actually changed the text
+    const titleTranslated = !payload.title || (translatedTitle && translatedTitle !== payload.title && translatedTitle.trim() !== '');
+    const contentTranslated = !payload.content || (translatedContent && translatedContent !== payload.content && translatedContent.trim() !== '');
+
+    // Only proceed if at least one part was actually translated
+    if (!titleTranslated && !contentTranslated) {
+      console.error('Translation failed: API returned original text');
+      throw new Error('Translation service returned original text. Please try again.');
+    }
+
     const record: PostTranslation = {
       postId,
       lang: targetLang,
-      title: translatedTitle,
-      content: translatedContent,
+      title: translatedTitle || payload.title || '',
+      content: translatedContent || payload.content || '',
       createdAt: new Date()
     };
 
