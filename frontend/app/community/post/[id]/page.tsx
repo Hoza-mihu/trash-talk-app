@@ -35,9 +35,11 @@ export default function PostDetailPage() {
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
   const [toast, setToast] = useState<{ id: number; text: string; tone?: 'success' | 'error' | 'info' } | null>(null);
   const actionMenuRef = useRef<HTMLDivElement>(null);
+  const toastSeq = useRef(0);
 
   const showToast = (text: string, tone: 'success' | 'error' | 'info' = 'info') => {
-    setToast({ id: Date.now(), text, tone });
+    toastSeq.current += 1;
+    setToast({ id: toastSeq.current, text, tone });
   };
 
   useEffect(() => {

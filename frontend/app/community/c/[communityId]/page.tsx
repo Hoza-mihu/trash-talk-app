@@ -115,9 +115,11 @@ export default function CommunityPage() {
   const [postActions, setPostActions] = useState<Record<string, PostAction>>({});
   const postActionsRef = useRef<Record<string, PostAction>>({});
   const [toast, setToast] = useState<{ id: number; text: string; tone?: 'success' | 'error' | 'info' } | null>(null);
+  const toastSeq = useRef(0);
 
   const showToast = (text: string, tone: 'success' | 'error' | 'info' = 'info') => {
-    setToast({ id: Date.now(), text, tone });
+    toastSeq.current += 1;
+    setToast({ id: toastSeq.current, text, tone });
   };
 
   useEffect(() => {
