@@ -33,8 +33,12 @@ export default function PostDetailPage() {
   const awardsMenuRef = useRef<HTMLDivElement>(null);
   const [postActionState, setPostActionState] = useState<PostAction | null>(null);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ id: number; text: string; tone?: 'success' | 'error' | 'info' } | null>(null);
   const actionMenuRef = useRef<HTMLDivElement>(null);
+
+  const showToast = (text: string, tone: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ id: Date.now(), text, tone });
+  };
 
   useEffect(() => {
     if (postId) {
@@ -62,10 +66,10 @@ export default function PostDetailPage() {
   }, [showAwardsMenu, actionMenuOpen]);
 
   useEffect(() => {
-    if (!statusMessage) return;
-    const timer = setTimeout(() => setStatusMessage(null), 2500);
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 2500);
     return () => clearTimeout(timer);
-  }, [statusMessage]);
+  }, [toast?.id]);
 
   useEffect(() => {
     if (!user || !community?.id) return;
@@ -239,7 +243,7 @@ export default function PostDetailPage() {
 
   const handleFollowPost = async () => {
     if (!user || !community) {
-      setStatusMessage('Please sign in to follow posts.');
+      showToast('Please sign in to follow posts.', 'error');
       return;
     }
     try {
@@ -252,9 +256,9 @@ export default function PostDetailPage() {
         followed: nextFollow,
         updatedAt: new Date()
       }));
-      setStatusMessage(nextFollow ? 'Post followed. You will get updates.' : 'Post unfollowed.');
+      showToast(nextFollow ? 'Post followed. You will get updates.' : 'Post unfollowed.', 'success');
     } catch (error: any) {
-      setStatusMessage(error?.message || 'Could not update follow status.');
+      showToast(error?.message || 'Could not update follow status.', 'error');
     } finally {
       setActionMenuOpen(false);
     }
@@ -262,7 +266,7 @@ export default function PostDetailPage() {
 
   const handleSavePost = async () => {
     if (!user || !community) {
-      setStatusMessage('Please sign in to save posts.');
+      showToast('Please sign in to save posts.', 'error');
       return;
     }
     try {
@@ -275,9 +279,9 @@ export default function PostDetailPage() {
         saved: nextSaved,
         updatedAt: new Date()
       }));
-      setStatusMessage(nextSaved ? 'Post saved to your list.' : 'Removed from saved.');
+      showToast(nextSaved ? 'Post saved to your list.' : 'Removed from saved.', 'success');
     } catch (error: any) {
-      setStatusMessage(error?.message || 'Could not update saved posts.');
+      showToast(error?.message || 'Could not update saved posts.', 'error');
     } finally {
       setActionMenuOpen(false);
     }
@@ -285,7 +289,7 @@ export default function PostDetailPage() {
 
   const handleHidePost = async () => {
     if (!user || !community) {
-      setStatusMessage('Please sign in to hide posts.');
+      showToast('Please sign in to hide posts.', 'error');
       return;
     }
     try {
@@ -298,12 +302,15 @@ export default function PostDetailPage() {
         hidden: nextHidden,
         updatedAt: new Date()
       }));
-      setStatusMessage(nextHidden ? 'Post hidden from your feed. Tap Unhide to bring it back.' : 'Post unhidden.');
+      showToast(
+        nextHidden ? 'Post hidden from your feed. Tap Unhide to bring it back.' : 'Post unhidden.',
+        'success'
+      );
       if (nextHidden) {
         router.push(`/community/c/${community.id}`);
       }
     } catch (error: any) {
-      setStatusMessage(error?.message || 'Could not update hide status.');
+      showToast(error?.message || 'Could not update hide status.', 'error');
     } finally {
       setActionMenuOpen(false);
     }
@@ -311,7 +318,7 @@ export default function PostDetailPage() {
 
   const handleTranslatePost = async () => {
     if (!user || !community || !post) {
-      setStatusMessage('Please sign in to translate posts.');
+      showToast('Please sign in to translate posts.', 'error');
       return;
     }
     const lang = prompt('Enter target language code (e.g., en, es, fr):', 'en') || 'en';
@@ -325,9 +332,9 @@ export default function PostDetailPage() {
         translated: true,
         updatedAt: new Date()
       }));
-      setStatusMessage(`Translation cached (${lang}).`);
+      showToast(`Translation cached (${lang}).`, 'success');
     } catch (error: any) {
-      setStatusMessage(error?.message || 'Translation failed.');
+      showToast(error?.message || 'Translation failed.', 'error');
     } finally {
       setActionMenuOpen(false);
     }
@@ -335,20 +342,20 @@ export default function PostDetailPage() {
 
   const handleReportPost = async () => {
     if (!user || !community || !community.id) {
-      setStatusMessage('Please sign in to report posts.');
+      showToast('Please sign in to report posts.', 'error');
       return;
     }
     const reason = (prompt('Why are you reporting this post? (spam, harassment, hate, other)', 'User report') || '').trim();
     if (!reason) {
-      setStatusMessage('Report cancelled.');
+      showToast('Report cancelled.', 'info');
       setActionMenuOpen(false);
       return;
     }
     try {
       await reportPost(community.id, postId, user.uid, reason);
-      setStatusMessage('Post reported. Thank you for your feedback.');
+      showToast('Post reported. Thank you for your feedback.', 'success');
     } catch (error: any) {
-      setStatusMessage(error?.message || 'Failed to report post.');
+      showToast(error?.message || 'Failed to report post.', 'error');
     } finally {
       setActionMenuOpen(false);
     }
@@ -802,10 +809,18 @@ export default function PostDetailPage() {
         </div>
       </div>
 
-      {statusMessage && (
-        <div className="fixed bottom-4 right-4 z-50">
-          <div className="bg-gray-900 text-white text-sm font-medium px-4 py-2 rounded-full shadow-lg">
-            {statusMessage}
+      {toast && (
+        <div className="fixed bottom-4 right-4 z-50" role="status" aria-live="polite">
+          <div
+            className={`text-sm font-medium px-4 py-2 rounded-full shadow-lg text-white ${
+              toast.tone === 'error'
+                ? 'bg-red-600'
+                : toast.tone === 'success'
+                  ? 'bg-emerald-600'
+                  : 'bg-gray-900'
+            }`}
+          >
+            {toast.text}
           </div>
         </div>
       )}

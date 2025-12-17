@@ -229,7 +229,7 @@ export interface PostAction {
   saved?: boolean;
   hidden?: boolean;
   translated?: boolean;
-  updatedAt: Timestamp | Date;
+  updatedAt: Timestamp | Date | ReturnType<typeof serverTimestamp>;
 }
 
 export interface PostTranslation {

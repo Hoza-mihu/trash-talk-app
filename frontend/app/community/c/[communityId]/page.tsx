@@ -114,7 +114,11 @@ export default function CommunityPage() {
   const [postMenuOpenId, setPostMenuOpenId] = useState<string | null>(null);
   const [postActions, setPostActions] = useState<Record<string, PostAction>>({});
   const postActionsRef = useRef<Record<string, PostAction>>({});
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ id: number; text: string; tone?: 'success' | 'error' | 'info' } | null>(null);
+
+  const showToast = (text: string, tone: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ id: Date.now(), text, tone });
+  };
 
   useEffect(() => {
     postActionsRef.current = postActions;
@@ -673,7 +677,7 @@ export default function CommunityPage() {
 
   const handleFollowPost = async (postId: string) => {
     if (!user || !communityId) {
-      setStatusMessage('Please sign in to follow posts.');
+      showToast('Please sign in to follow posts.', 'error');
       return;
     }
     try {
@@ -689,9 +693,9 @@ export default function CommunityPage() {
           updatedAt: new Date()
         }
       }));
-      setStatusMessage(nextFollow ? 'Post followed. You will get updates.' : 'Post unfollowed.');
+      showToast(nextFollow ? 'Post followed. You will get updates.' : 'Post unfollowed.', 'success');
     } catch (error: any) {
-      setStatusMessage(error?.message || 'Could not update follow status.');
+      showToast(error?.message || 'Could not update follow status.', 'error');
     } finally {
       setPostMenuOpenId(null);
     }
@@ -699,7 +703,7 @@ export default function CommunityPage() {
 
   const handleSavePost = async (postId: string) => {
     if (!user || !communityId) {
-      setStatusMessage('Please sign in to save posts.');
+      showToast('Please sign in to save posts.', 'error');
       return;
     }
     try {
@@ -715,9 +719,9 @@ export default function CommunityPage() {
           updatedAt: new Date()
         }
       }));
-      setStatusMessage(nextSaved ? 'Post saved to your list.' : 'Removed from saved.');
+      showToast(nextSaved ? 'Post saved to your list.' : 'Removed from saved.', 'success');
     } catch (error: any) {
-      setStatusMessage(error?.message || 'Could not update saved posts.');
+      showToast(error?.message || 'Could not update saved posts.', 'error');
     } finally {
       setPostMenuOpenId(null);
     }
@@ -725,7 +729,7 @@ export default function CommunityPage() {
 
   const handleHidePost = async (postId: string) => {
     if (!user || !communityId) {
-      setStatusMessage('Please sign in to hide posts.');
+      showToast('Please sign in to hide posts.', 'error');
       return;
     }
     try {
@@ -741,9 +745,9 @@ export default function CommunityPage() {
           updatedAt: new Date()
         }
       }));
-      setStatusMessage(nextHidden ? 'Post hidden from your feed. Click unhide to bring it back.' : 'Post unhidden.');
+      showToast(nextHidden ? 'Post hidden from your feed. Click unhide to bring it back.' : 'Post unhidden.', 'success');
     } catch (error: any) {
-      setStatusMessage(error?.message || 'Could not update hide status.');
+      showToast(error?.message || 'Could not update hide status.', 'error');
     } finally {
       setPostMenuOpenId(null);
     }
@@ -751,7 +755,7 @@ export default function CommunityPage() {
 
   const handleTranslatePost = async (postId: string, title?: string, content?: string) => {
     if (!user || !communityId) {
-      setStatusMessage('Please sign in to translate posts.');
+      showToast('Please sign in to translate posts.', 'error');
       return;
     }
     const lang = prompt('Enter target language code (e.g., en, es, fr):', 'en') || 'en';
@@ -768,9 +772,9 @@ export default function CommunityPage() {
           updatedAt: new Date()
         }
       }));
-      setStatusMessage(`Translation ready and cached (${lang}).`);
+      showToast(`Translation ready and cached (${lang}).`, 'success');
     } catch (error: any) {
-      setStatusMessage(error?.message || 'Translation failed.');
+      showToast(error?.message || 'Translation failed.', 'error');
     } finally {
       setPostMenuOpenId(null);
     }
@@ -778,30 +782,30 @@ export default function CommunityPage() {
 
   const handleReportPost = async (postId: string) => {
     if (!user || !communityId) {
-      setStatusMessage('Please sign in to report posts.');
+      showToast('Please sign in to report posts.', 'error');
       return;
     }
     const reason = (prompt('Why are you reporting this post? (spam, harassment, hate, other)', 'spam') || '').trim();
     if (!reason) {
       setPostMenuOpenId(null);
-      setStatusMessage('Report cancelled.');
+      showToast('Report cancelled.', 'info');
       return;
     }
     try {
       await reportPost(communityId, postId, user.uid, reason);
-      setStatusMessage('Post reported. Thanks for your feedback.');
+      showToast('Post reported. Thanks for your feedback.', 'success');
     } catch (error: any) {
-      setStatusMessage(error?.message || 'Failed to report post.');
+      showToast(error?.message || 'Failed to report post.', 'error');
     } finally {
       setPostMenuOpenId(null);
     }
   };
 
   useEffect(() => {
-    if (!statusMessage) return;
-    const timer = setTimeout(() => setStatusMessage(null), 2500);
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 2500);
     return () => clearTimeout(timer);
-  }, [statusMessage]);
+  }, [toast?.id]);
 
   const handleDeleteCommunity = async () => {
     if (!user || !community) return;
@@ -1090,10 +1094,18 @@ export default function CommunityPage() {
           <div className="animate-spin w-12 h-12 border-4 border-green-600 border-t-transparent rounded-full mx-auto mb-4"></div>
           <p className="text-gray-600">Loading community...</p>
         </div>
-      {statusMessage && (
-        <div className="fixed bottom-4 right-4 z-50">
-          <div className="bg-gray-900 text-white text-sm font-medium px-4 py-2 rounded-full shadow-lg">
-            {statusMessage}
+      {toast && (
+        <div className="fixed bottom-4 right-4 z-50" role="status" aria-live="polite">
+          <div
+            className={`text-sm font-medium px-4 py-2 rounded-full shadow-lg text-white ${
+              toast.tone === 'error'
+                ? 'bg-red-600'
+                : toast.tone === 'success'
+                  ? 'bg-emerald-600'
+                  : 'bg-gray-900'
+            }`}
+          >
+            {toast.text}
           </div>
         </div>
       )}
